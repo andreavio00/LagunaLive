@@ -24,6 +24,11 @@ async function loadPalazzoCavalli() {
 
   document.getElementById("temp").innerHTML =
     temperatura + " °C";
+document.getElementById("humidity").innerHTML =
+  umidita + " %";
+
+document.getElementById("pressure").innerHTML =
+  pressione + " hPa";
 
   console.log({
     pressione,
