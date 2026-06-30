@@ -1,16 +1,16 @@
+async function test() {
+  const url = "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
 
-async function testSource(name,url){
-  try{
-    const r=await fetch(url);
-    return `${name}: OK (${r.status})`;
-  }catch(e){
-    return `${name}: ERRORE/CORS`;
+  try {
+    const response = await fetch(url);
+    const text = await response.text();
+
+    document.getElementById("status").innerHTML =
+      "Ricevuti " + text.length + " caratteri";
+  } catch (e) {
+    document.getElementById("status").innerHTML =
+      "Errore: " + e.message;
   }
 }
-(async()=>{
- const results=await Promise.all([
-   testSource('CPSM','https://www.comune.venezia.it/'),
-   testSource('MeteoNetwork','https://www.meteonetwork.eu/')
- ]);
- document.getElementById('status').innerHTML=results.join('<br>');
-})();
+
+test();
