@@ -1,12 +1,35 @@
-async function test() {
+async function loadPalazzoCavalli() {
   const url =
     "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
 
   const response = await fetch(url);
   const text = await response.text();
 
+  const rows = text
+    .split("\n")
+    .filter(line => line.startsWith("| 2026-"));
+
+  const lastRow = rows[rows.length - 1];
+
+  const cols = lastRow
+    .split("|")
+    .map(x => x.trim());
+
+  const pressione = cols[2];
+  const temperatura = cols[3];
+  const umidita = cols[4];
+
   document.getElementById("status").innerHTML =
-    text.substring(0, 1000).replaceAll("\n", "<br>");
+    "Palazzo Cavalli OK";
+
+  document.getElementById("temp").innerHTML =
+    temperatura + " °C";
+
+  console.log({
+    pressione,
+    temperatura,
+    umidita
+  });
 }
 
-test();
+loadPalazzoCavalli();
