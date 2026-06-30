@@ -58,3 +58,14 @@ async function loadAll() {
 }
 
 loadAll();
+async function loadStationsConfig() {
+    const response = await fetch("stations.json");
+    const config = await response.json();
+
+    document.getElementById("stationsStatus").innerHTML =
+        config.stations
+            .map(s => "✓ " + s.name)
+            .join("<br>");
+}
+
+loadStationsConfig();
