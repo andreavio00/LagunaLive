@@ -1,43 +1,52 @@
 {
-  "punta_salute": {
-    "name": "Punta della Salute",
-    "type": "cpsm",
-    "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html",
-    "measures": ["tide", "water_temperature"]
-  },
-
-  "palazzo_cavalli": {
-    "name": "Palazzo Cavalli",
-    "type": "cpsm",
-    "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html",
-    "measures": ["temperature", "humidity", "pressure"]
-  },
-
-  "san_giorgio": {
-    "name": "San Giorgio",
-    "type": "cpsm",
-    "url": "",
-    "measures": ["temperature", "humidity"]
-  },
-
-  "misericordia": {
-    "name": "Misericordia",
-    "type": "cpsm",
-    "url": "",
-    "measures": ["tide_backup"]
-  },
-
-  "cavanis": {
-    "name": "Osservatorio Cavanis",
-    "type": "meteonetwork",
-    "url": "",
-    "measures": ["temperature", "humidity"]
-  },
-
-  "ismar": {
-    "name": "ISMAR",
-    "type": "ismar",
-    "url": "",
-    "measures": ["temperature", "humidity"]
-  }
+  "stations": [
+    {
+      "id": "punta_salute",
+      "name": "Punta della Salute",
+      "type": "cpsm",
+      "role": "tide_primary",
+      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html",
+      "measures": ["tide", "water_temperature"]
+    },
+    {
+      "id": "misericordia",
+      "name": "Misericordia",
+      "type": "cpsm",
+      "role": "tide_backup",
+      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html",
+      "measures": ["tide"]
+    },
+    {
+      "id": "palazzo_cavalli",
+      "name": "Palazzo Cavalli",
+      "type": "cpsm",
+      "role": "urban",
+      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html",
+      "measures": ["temperature", "humidity", "pressure"]
+    },
+    {
+      "id": "san_giorgio",
+      "name": "San Giorgio",
+      "type": "cpsm",
+      "role": "urban",
+      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html",
+      "measures": ["temperature", "humidity", "wind"]
+    },
+    {
+      "id": "cavanis",
+      "name": "Osservatorio Cavanis",
+      "type": "meteonetwork",
+      "role": "urban",
+      "url": "",
+      "measures": ["temperature", "humidity"]
+    },
+    {
+      "id": "cnr",
+      "name": "Piattaforma CNR",
+      "type": "cpsm",
+      "role": "marine_reference",
+      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Piattaforma_CNR.html",
+      "measures": ["temperature", "humidity", "water_temperature"]
+    }
+  ]
 }
