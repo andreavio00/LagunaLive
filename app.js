@@ -11,11 +11,11 @@ function median(values) {
 }
 function formatTime(timestamp) {
 
-  const parts = timestamp.split(" ");
+  return timestamp
+    .replace("T", " ")
+    .split(" ")[1]
+    .substring(0,5);
 
-  if (parts.length < 2) return timestamp;
-
-  return parts[1].substring(0, 5);
 }
 function windDirection(deg) {
 
@@ -248,7 +248,7 @@ document.getElementById("tempDetails").innerHTML =
 <div class="details">
   <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C (${formatTime(cavalli.timestamp)})</div>
   <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C (${formatTime(sanGiorgio.timestamp)})</div>
-  <div>Cavanis: ${formatTime(cavanis.timestamp)} • ${cavanis.temperature.toFixed(1)} °C</div>
+  <div>Cavanis: ${cavanis.temperature.toFixed(1)} °C (${formatTime(cavanis.timestamp)})</div>
 </div>
 `;
     document.getElementById("humidity").innerHTML =
@@ -260,14 +260,8 @@ document.getElementById("humidityDetails").innerHTML =
 <div class="details">
   <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
   <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
-  <div>Cavanis: ${cavanis.humidity.toFixed(0)} % function formatTime(timestamp) {
-
-  return timestamp
-    .replace("T", " ")
-    .split(" ")[1]
-    .substring(0,5);
-
-}
+  <div>Cavanis: ${cavanis.humidity.toFixed(0)} % (${formatTime(cavanis.timestamp)})</div>
+</div>
 `;
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) +
