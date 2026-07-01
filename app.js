@@ -1,71 +1,192 @@
+function median(values) {
+  values.sort((a, b) => a - b);
+
+  const middle = Math.floor(values.length / 2);
+
+  if (values.length % 2 === 0) {
+    return (values[middle - 1] + values[middle]) / 2;
+  }
+
+  return values[middle];
+}
+
+function windDirection(deg) {
+
+  const dirs = [
+    "N", "NE", "E", "SE",
+    "S", "SO", "O", "NO"
+  ];
+
+  return dirs[Math.round(deg / 45) % 8];
+}
+
 async function loadPalazzoCavalli() {
+
   const url =
     "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
 
   const response = await fetch(url);
   const text = await response.text();
 
-  const rows = text.split("\n")
+  const rows = text
+    .split("\n")
     .filter(line => line.startsWith("| 2026-"));
 
   const lastRow = rows[rows.length - 1];
 
-  const cols = lastRow.split("|").map(x => x.trim());
+  const cols = lastRow
+    .split("|")
+    .map(x => x.trim());
 
-  document.getElementById("temp").innerHTML =
-    cols[3] + " °C";
+  return {
+    timestamp: cols[1],
+    pressure: parseFloat(cols[2]),
+    temperature: parseFloat(cols[3]),
+    humidity: parseFloat(cols[4])
+  };
+}
 
-  document.getElementById("humidity").innerHTML =
-    cols[4] + " %";
+async function loadSanGiorgio() {
 
-  document.getElementById("pressure").innerHTML =
-    cols[2] + " hPa";
+  const url =
+    "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html";
+
+  const response = await fetch(url);
+  const text = await response.text();
+
+  const rows = text
+    .split("\n")
+    .filter(line => line.startsWith("| 2026-"));
+
+  const lastRow = rows[rows.length - 1];
+
+  const cols = lastRow
+    .split("|")
+    .map(x => x.trim());
+
+  return {
+    timestamp: cols[1],
+    windDir: parseFloat(cols[2]),
+    windSpeed: parseFloat(cols[3]),
+    windGust: parseFloat(cols[4]),
+    temperature: parseFloat(cols[5]),
+    humidity: parseFloat(cols[6])
+  };
 }
 
 async function loadPuntaSalute() {
+
   const url =
     "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html";
 
   const response = await fetch(url);
   const text = await response.text();
 
-  const rows = text.split("\n")
+  const rows = text
+    .split("\n")
     .filter(line => line.startsWith("| 2026-"));
 
   const lastRow = rows[rows.length - 1];
+  const previousRow = rows[rows.length - 3];
 
-  const cols = lastRow.split("|").map(x => x.trim());
+  const cols = lastRow
+    .split("|")
+    .map(x => x.trim());
 
-  const livelloMetri = parseFloat(cols[2]);
-  const livelloCm = Math.round(livelloMetri * 100);
+  const prevCols = previousRow
+    .split("|")
+    .map(x => x.trim());
 
-  document.getElementById("tide").innerHTML =
-    livelloCm + " cm";
+  const tide = Math.round(parseFloat(cols[2]) * 100);
+  const prevTide = Math.round(parseFloat(prevCols[2]) * 100);
 
-  document.getElementById("waterTemp").innerHTML =
-    cols[3] + " °C";
+  let trend = "→";
+
+  if (tide > prevTide) trend = "↑";
+  if (tide < prevTide) trend = "↓";
+
+  return {
+    timestamp: cols[1],
+    tide,
+    trend,
+    waterTemp: parseFloat(cols[3])
+  };
+}
+
+async function loadStationsConfig() {
+
+  const response = await fetch("stations.json");
+  const config = await response.json();
+
+  document.getElementById("stationsStatus").innerHTML =
+    config.stations
+      .map(station => "✓ " + station.name)
+      .join("<br>");
 }
 
 async function loadAll() {
-  await Promise.all([
-    loadPalazzoCavalli(),
-    loadPuntaSalute()
-  ]);
 
-  document.getElementById("status").innerHTML =
-    "Aggiornato: " +
-    new Date().toLocaleTimeString("it-IT");
-}
+  try {
 
-loadAll();
-async function loadStationsConfig() {
-    const response = await fetch("stations.json");
-    const config = await response.json();
+    const [
+      cavalli,
+      sanGiorgio,
+      puntaSalute
+    ] = await Promise.all([
+      loadPalazzoCavalli(),
+      loadSanGiorgio(),
+      loadPuntaSalute()
+    ]);
 
-    document.getElementById("stationsStatus").innerHTML =
-        config.stations
-            .map(s => "✓ " + s.name)
-            .join("<br>");
+    const temp = median([
+      cavalli.temperature,
+      sanGiorgio.temperature
+    ]);
+
+    const humidity = median([
+      cavalli.humidity,
+      sanGiorgio.humidity
+    ]);
+
+    document.getElementById("tide").innerHTML =
+      puntaSalute.tide +
+      " cm " +
+      puntaSalute.trend;
+
+    document.getElementById("waterTemp").innerHTML =
+      puntaSalute.waterTemp.toFixed(1) +
+      " °C";
+
+    document.getElementById("temp").innerHTML =
+      temp.toFixed(1) +
+      " °C<br><small>(2 sensori)</small>";
+
+    document.getElementById("humidity").innerHTML =
+      humidity.toFixed(0) +
+      " %<br><small>(2 sensori)</small>";
+
+    document.getElementById("pressure").innerHTML =
+      cavalli.pressure.toFixed(1) +
+      " hPa";
+
+    document.getElementById("wind").innerHTML =
+      windDirection(sanGiorgio.windDir) +
+      " " +
+      Math.round(sanGiorgio.windSpeed * 3.6) +
+      " km/h";
+
+    document.getElementById("status").innerHTML =
+      "Marea: " + puntaSalute.timestamp +
+      "<br>Aria: " + cavalli.timestamp;
+
+  } catch (error) {
+
+    console.error(error);
+
+    document.getElementById("status").innerHTML =
+      "Errore caricamento dati";
+  }
 }
 
 loadStationsConfig();
+loadAll();
