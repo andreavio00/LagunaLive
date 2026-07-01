@@ -178,11 +178,12 @@ async function loadMisericordia() {
   if (tide < prevTide) trend = "↓";
 
   return {
-    timestamp: cols[1],
-    tide,
-    trend,
-    source: "Misericordia"
-  };
+  timestamp: cols[1],
+  tide,
+  trend,
+  source: "Misericordia",
+  waterTemp: null
+};
 }
 
 async function loadStationsConfig() {
@@ -235,9 +236,13 @@ try {
       " cm " +
       puntaSalute.trend;
 
-    document.getElementById("waterTemp").innerHTML =
-      puntaSalute.waterTemp.toFixed(1) +
-      " °C";
+    if (puntaSalute.waterTemp !== undefined) {
+  document.getElementById("waterTemp").innerHTML =
+    puntaSalute.waterTemp.toFixed(1) + " °C";
+} else {
+  document.getElementById("waterTemp").innerHTML =
+    "--";
+}
 
     document.getElementById("temp").innerHTML =
       temp.toFixed(1) +
