@@ -81,6 +81,32 @@ async function loadSanGiorgio() {
   };
 }
 
+async function loadCavanis() {
+
+  const url =
+    "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
+
+  const response = await fetch(url);
+  const json = await response.json();
+
+  const data = json.data;
+
+  const tempRows =
+    data.filter(r => r.tipo === "TARIA2M");
+
+  const humidityRows =
+    data.filter(r => r.tipo === "UMID2M");
+
+  const lastTemp = tempRows[tempRows.length - 1];
+  const lastHumidity = humidityRows[humidityRows.length - 1];
+
+  return {
+    timestamp: lastTemp.dataora,
+    temperature: parseFloat(lastTemp.valore),
+    humidity: parseFloat(lastHumidity.valore)
+  };
+}
+
 async function loadPuntaSalute() {
 
   const url =
@@ -176,6 +202,7 @@ async function loadAll() {
 
     const cavalli = await loadPalazzoCavalli();
 const sanGiorgio = await loadSanGiorgio();
+const cavanis = await loadCavanis();
 
 let puntaSalute;
 
@@ -192,14 +219,16 @@ try {
 }
 
     const temp = median([
-      cavalli.temperature,
-      sanGiorgio.temperature
-    ]);
+  cavalli.temperature,
+  sanGiorgio.temperature,
+  cavanis.temperature
+]);
 
     const humidity = median([
-      cavalli.humidity,
-      sanGiorgio.humidity
-    ]);
+  cavalli.humidity,
+  sanGiorgio.humidity,
+  cavanis.humidity
+]);
 
     document.getElementById("tide").innerHTML =
       puntaSalute.tide +
@@ -212,7 +241,7 @@ try {
 
     document.getElementById("temp").innerHTML =
       temp.toFixed(1) +
-      " °C<br><small>(2 sensori)</small>";
+      " °C<br><small>(3 sensori)</small>";
 
 document.getElementById("tempDetails").innerHTML =
   `
@@ -223,14 +252,16 @@ document.getElementById("tempDetails").innerHTML =
   `;
     document.getElementById("humidity").innerHTML =
       humidity.toFixed(0) +
-      " %<br><small>(2 sensori)</small>";
+      " %<br><small>(3 sensori)</small>";
+
 document.getElementById("humidityDetails").innerHTML =
-  `
-  <div class="details">
-    <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} %</div>
-    <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} %</div>
-  </div>
-  `;
+`
+<div class="details">
+  <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} %</div>
+  <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} %</div>
+  <div>Cavanis: ${cavanis.humidity.toFixed(0)} %</div>
+</div>
+`;
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) +
       " hPa";
