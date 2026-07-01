@@ -110,7 +110,7 @@ async function loadCavanis() {
 async function loadPuntaSalute() {
 
   const url =
-"https://r.jina.ai/http://www.comune.venezia.it/PUNTA_SALUTE_NON_ESISTE.html";
+"https://r.jina.ai/http://www.comune.venezia.it/PUNTA_SALUTE.html";
 
   const response = await fetch(url);
   const text = await response.text();
