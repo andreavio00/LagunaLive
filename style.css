@@ -4,3 +4,12 @@ body{font-family:Arial,sans-serif;padding:20px;background:#f5f7fa}.card{backgrou
   color: #666;
   margin-top: 4px;
 }
+.details {
+  margin-top: 8px;
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.details div {
+  margin: 2px 0;
+}
