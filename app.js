@@ -120,6 +120,45 @@ async function loadPuntaSalute() {
   };
 }
 
+async function loadMisericordia() {
+
+  const url =
+    "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html";
+
+  const response = await fetch(url);
+  const text = await response.text();
+
+  const rows = text
+    .split("\n")
+    .filter(line => line.startsWith("| 2026-"));
+
+  const lastRow = rows[rows.length - 1];
+  const previousRow = rows[rows.length - 3];
+
+  const cols = lastRow
+    .split("|")
+    .map(x => x.trim());
+
+  const prevCols = previousRow
+    .split("|")
+    .map(x => x.trim());
+
+  const tide = Math.round(parseFloat(cols[2]) * 100);
+  const prevTide = Math.round(parseFloat(prevCols[2]) * 100);
+
+  let trend = "→";
+
+  if (tide > prevTide) trend = "↑";
+  if (tide < prevTide) trend = "↓";
+
+  return {
+    timestamp: cols[1],
+    tide,
+    trend,
+    source: "Misericordia"
+  };
+}
+
 async function loadStationsConfig() {
 
   const response = await fetch("stations.json");
@@ -135,15 +174,22 @@ async function loadAll() {
 
   try {
 
-    const [
-      cavalli,
-      sanGiorgio,
-      puntaSalute
-    ] = await Promise.all([
-      loadPalazzoCavalli(),
-      loadSanGiorgio(),
-      loadPuntaSalute()
-    ]);
+    const cavalli = await loadPalazzoCavalli();
+const sanGiorgio = await loadSanGiorgio();
+
+let puntaSalute;
+
+try {
+
+  puntaSalute = await loadPuntaSalute();
+  puntaSalute.source = "Punta Salute";
+
+} catch (err) {
+
+  console.warn("Punta Salute non disponibile");
+
+  puntaSalute = await loadMisericordia();
+}
 
     const temp = median([
       cavalli.temperature,
@@ -167,6 +213,7 @@ async function loadAll() {
     document.getElementById("temp").innerHTML =
       temp.toFixed(1) +
       " °C<br><small>(2 sensori)</small>";
+
 document.getElementById("tempDetails").innerHTML =
   `
   <div class="details">
@@ -193,7 +240,8 @@ document.getElementById("humidityDetails").innerHTML =
       " " +
       Math.round(sanGiorgio.windSpeed * 3.6) +
       " km/h";
-
+document.getElementById("tideSource").innerHTML =
+  puntaSalute.source;
    document.getElementById("tideTime").innerHTML =
   formatTime(puntaSalute.timestamp);
 
