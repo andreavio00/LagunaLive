@@ -246,9 +246,9 @@ try {
 document.getElementById("tempDetails").innerHTML =
 `
 <div class="details">
-  <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C</div>
-  <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C</div>
-  <div>Cavanis: ${cavanis.temperature.toFixed(1)} °C</div>
+  <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C (${formatTime(cavalli.timestamp)})</div>
+  <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C (${formatTime(sanGiorgio.timestamp)})</div>
+  <div>Cavanis: ${formatTime(cavanis.timestamp)} • ${cavanis.temperature.toFixed(1)} °C</div>
 </div>
 `;
     document.getElementById("humidity").innerHTML =
@@ -258,10 +258,16 @@ document.getElementById("tempDetails").innerHTML =
 document.getElementById("humidityDetails").innerHTML =
 `
 <div class="details">
-  <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} %</div>
-  <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} %</div>
-  <div>Cavanis: ${cavanis.humidity.toFixed(0)} %</div>
-</div>
+  <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
+  <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
+  <div>Cavanis: ${cavanis.humidity.toFixed(0)} % function formatTime(timestamp) {
+
+  return timestamp
+    .replace("T", " ")
+    .split(" ")[1]
+    .substring(0,5);
+
+}
 `;
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) +
