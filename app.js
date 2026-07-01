@@ -244,12 +244,13 @@ try {
       " °C<br><small>(3 sensori)</small>";
 
 document.getElementById("tempDetails").innerHTML =
-  `
-  <div class="details">
-    <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C</div>
-    <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C</div>
-  </div>
-  `;
+`
+<div class="details">
+  <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C</div>
+  <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C</div>
+  <div>Cavanis: ${cavanis.temperature.toFixed(1)} °C</div>
+</div>
+`;
     document.getElementById("humidity").innerHTML =
       humidity.toFixed(0) +
       " %<br><small>(3 sensori)</small>";
