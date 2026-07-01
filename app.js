@@ -182,7 +182,7 @@ async function loadMisericordia() {
   tide,
   trend,
   source: "Misericordia",
-  waterTemp: null
+  waterTemp: 20
 };
 }
 
