@@ -110,7 +110,7 @@ async function loadCavanis() {
 async function loadPuntaSalute() {
 
   const url =
-"https://r.jina.ai/http://www.comune.venezia.it/PUNTA_SALUTE.html";
+"https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html";
 
   const response = await fetch(url);
   const text = await response.text();
@@ -239,7 +239,7 @@ try {
     document.getElementById("waterTemp").innerHTML =
   puntaSalute.waterTemp != null
     ? puntaSalute.waterTemp.toFixed(1) + " °C"
-    : "--";
+    : "n.d.";
 
     document.getElementById("temp").innerHTML =
       temp.toFixed(1) +
