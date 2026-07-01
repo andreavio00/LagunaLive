@@ -9,7 +9,14 @@ function median(values) {
 
   return values[middle];
 }
+function formatTime(timestamp) {
 
+  const parts = timestamp.split(" ");
+
+  if (parts.length < 2) return timestamp;
+
+  return parts[1].substring(0, 5);
+}
 function windDirection(deg) {
 
   const dirs = [
@@ -175,9 +182,12 @@ async function loadAll() {
       Math.round(sanGiorgio.windSpeed * 3.6) +
       " km/h";
 
-    document.getElementById("status").innerHTML =
-      "Marea: " + puntaSalute.timestamp +
-      "<br>Aria: " + cavalli.timestamp;
+   document.getElementById("tideTime").innerHTML =
+  formatTime(puntaSalute.timestamp);
+
+document.getElementById("airTime").innerHTML =
+  formatTime(cavalli.timestamp);
+ document.getElementById("status").innerHTML = "";
 
   } catch (error) {
 
