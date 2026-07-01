@@ -167,11 +167,23 @@ async function loadAll() {
     document.getElementById("temp").innerHTML =
       temp.toFixed(1) +
       " °C<br><small>(2 sensori)</small>";
-
+document.getElementById("tempDetails").innerHTML =
+  `
+  <div class="details">
+    <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C</div>
+    <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C</div>
+  </div>
+  `;
     document.getElementById("humidity").innerHTML =
       humidity.toFixed(0) +
       " %<br><small>(2 sensori)</small>";
-
+document.getElementById("humidityDetails").innerHTML =
+  `
+  <div class="details">
+    <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} %</div>
+    <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} %</div>
+  </div>
+  `;
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) +
       " hPa";
