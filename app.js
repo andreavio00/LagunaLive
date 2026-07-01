@@ -182,7 +182,7 @@ async function loadMisericordia() {
   tide,
   trend,
   source: "Misericordia",
-  waterTemp: 20
+  waterTemp: null
 };
 }
 
@@ -236,13 +236,10 @@ try {
       " cm " +
       puntaSalute.trend;
 
-    if (puntaSalute.waterTemp !== undefined) {
-  document.getElementById("waterTemp").innerHTML =
-    puntaSalute.waterTemp.toFixed(1) + " °C";
-} else {
-  document.getElementById("waterTemp").innerHTML =
-    "--";
-}
+    document.getElementById("waterTemp").innerHTML =
+  puntaSalute.waterTemp != null
+    ? puntaSalute.waterTemp.toFixed(1) + " °C"
+    : "--";
 
     document.getElementById("temp").innerHTML =
       temp.toFixed(1) +
