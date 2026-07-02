@@ -9,14 +9,22 @@ function median(values) {
 
   return values[middle];
 }
+
 function formatTime(timestamp) {
 
-  return timestamp
-    .replace("T", " ")
-    .split(" ")[1]
-    .substring(0,5);
+  const date = new Date(
+    timestamp.replace(" ", "T") + "+01:00"
+  );
 
+  return date.toLocaleTimeString(
+    "it-IT",
+    {
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
 }
+
 function windDirection(deg) {
 
   const dirs = [
