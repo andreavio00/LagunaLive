@@ -69,6 +69,18 @@ const STATION_LABELS = {
   cnr: CNR_LABELS
 };
 
+// Colonne verificate direttamente su uno screenshot della scheda reale.
+// Per le stazioni non verificate (Misericordia, CNR) nascondiamo le
+// colonne extra invece di etichettarle genericamente "Colonna N", che
+// non da' nessuna informazione utile.
+const STATION_LABELS_VERIFIED = {
+  punta_salute: true,
+  misericordia: false,
+  palazzo_cavalli: true,
+  san_giorgio: true,
+  cnr: false
+};
+
 function formatTime(timestamp) {
 
   const date = new Date(
@@ -152,6 +164,13 @@ function vaporPressure(tempC, humidity) {
 // adottata dal Bureau of Meteorology australiano, che e'
 // l'equivalente aperto piu' vicino: include anch'essa temperatura,
 // umidita', vento e radiazione solare.
+//
+// Il termine solare va limitato a un intervallo fisico ragionevole:
+// usare la radiazione misurata (centinaia di W/mq) cosi' com'e' fa
+// esplodere il risultato quando il vento e' vicino a zero, perche' il
+// termine e' diviso per (vento + 10). Lo stesso Davis, per il termine
+// "sole" del suo indice, documenta un limite tra -20 e +130 W/mq:
+// usiamo lo stesso limite qui.
 function apparentTemperatureSun(tempC, humidity, windSpeedMs, solarRadiation) {
 
   if (
@@ -162,7 +181,7 @@ function apparentTemperatureSun(tempC, humidity, windSpeedMs, solarRadiation) {
   }
 
   const e = vaporPressure(tempC, humidity);
-  const Q = Math.max(0, solarRadiation);
+  const Q = Math.max(-20, Math.min(130, solarRadiation));
 
   return (
     tempC +
@@ -178,7 +197,13 @@ function apparentTemperatureSun(tempC, humidity, windSpeedMs, solarRadiation) {
 // quindi solo l'ULTIMA riga (il dato piu' recente) e la abbiniamo alle
 // etichette note per quella stazione, invece di mostrare piu' righe di
 // dati che confonderebbero l'utente.
-function parseLastRowLabeled(text, labels) {
+//
+// showUnknown: se true, le colonne oltre quelle etichettate vengono
+// comunque mostrate come "Colonna N" (utile quando l'ordine delle
+// colonne e' stato verificato, es. Palazzo Cavalli). Se false, le
+// colonne senza etichetta verificata vengono nascoste invece di
+// mostrare un dato senza indicazione di cosa sia.
+function parseLastRowLabeled(text, labels, showUnknown = true) {
 
   const dataLines = text
     .split("\n")
@@ -199,12 +224,23 @@ function parseLastRowLabeled(text, labels) {
       return true;
     });
 
-  return cells.map((value, i) => ({
-    label: labels[i] || ("Colonna " + (i + 1)),
-    value: i === 0
-      ? (value !== "" ? formatDateTime(value) : "n.d.")
-      : (value !== "" ? value : "n.d.")
-  }));
+  const rows = [];
+
+  cells.forEach((value, i) => {
+
+    if (i >= labels.length && !showUnknown) {
+      return;
+    }
+
+    rows.push({
+      label: labels[i] || ("Colonna " + (i + 1)),
+      value: i === 0
+        ? (value !== "" ? formatDateTime(value) : "n.d.")
+        : (value !== "" ? value : "n.d.")
+    });
+  });
+
+  return rows;
 }
 
 async function loadPalazzoCavalli() {
@@ -264,19 +300,22 @@ async function loadCavanis() {
 
   const data = json.data;
 
-  const tempRows =
-    data.filter(r => r.tipo === "TARIA2M");
+  const lastOfType = (tipo) => {
+    const rows = data.filter(r => r.tipo === tipo);
+    return rows.length ? rows[rows.length - 1] : null;
+  };
 
-  const humidityRows =
-    data.filter(r => r.tipo === "UMID2M");
-
-  const lastTemp = tempRows[tempRows.length - 1];
-  const lastHumidity = humidityRows[humidityRows.length - 1];
+  const lastTemp = lastOfType("TARIA2M");
+  const lastHumidity = lastOfType("UMID2M");
+  const lastRadiation = lastOfType("RADSOL");
+  const lastWindSpeed = lastOfType("VVENTO10M");
 
   return {
     timestamp: lastTemp.dataora,
     temperature: parseFloat(lastTemp.valore),
-    humidity: parseFloat(lastHumidity.valore)
+    humidity: parseFloat(lastHumidity.valore),
+    radiation: lastRadiation ? parseFloat(lastRadiation.valore) : null,
+    windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null
   };
 }
 
@@ -391,7 +430,8 @@ async function loadStationsConfig() {
 
       if (station.url) {
         const labels = STATION_LABELS[station.id] || ["Data/Ora"];
-        openStationModal(station.name, "https://r.jina.ai/" + station.url, labels);
+        const verified = STATION_LABELS_VERIFIED[station.id] !== false;
+        openStationModal(station.name, "https://r.jina.ai/" + station.url, labels, verified);
       }
     });
 
@@ -412,7 +452,7 @@ function hideModal() {
   document.getElementById("modalOverlay").classList.remove("open");
 }
 
-async function openStationModal(title, url, labels) {
+async function openStationModal(title, url, labels, showUnknown = true) {
 
   showModal(title, "<p>Caricamento dati aggiornati...</p>");
 
@@ -421,7 +461,7 @@ async function openStationModal(title, url, labels) {
     const response = await fetch(url);
     const text = await response.text();
 
-    const rows = parseLastRowLabeled(text, labels);
+    const rows = parseLastRowLabeled(text, labels, showUnknown);
 
     if (!rows) {
       throw new Error("Dati non trovati");
@@ -438,7 +478,7 @@ async function openStationModal(title, url, labels) {
   } catch (err) {
 
     console.error(err);
-    showModal(title, "<p>Errore nel caricamento dei dati.</p>");
+    showModal(title, "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>");
   }
 }
 
@@ -511,8 +551,8 @@ async function loadAll() {
     const thsw = apparentTemperatureSun(
       cavanis.temperature,
       cavanis.humidity,
-      sanGiorgio.windSpeed,
-      cavalli.radiation
+      cavanis.windSpeed,
+      cavanis.radiation
     );
 
     document.getElementById("thsw").innerHTML =
