@@ -60,27 +60,6 @@ function formatTime(timestamp) {
   );
 }
 
-// Le tabelle del Comune riportano sempre l'ora solare (UTC+1, tutto
-// l'anno). Questa funzione converte in data/ora "civile" (ora legale
-// quando è in vigore), stesso meccanismo usato da formatTime().
-function formatDateTime(timestamp) {
-
-  const date = new Date(
-    timestamp.replace(" ", "T") + "+01:00"
-  );
-
-  return date.toLocaleString(
-    "it-IT",
-    {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
-}
-
 function windDirection(deg) {
 
   const dirs = [
@@ -145,9 +124,7 @@ function parseLastRowLabeled(text, labels) {
 
   return cells.map((value, i) => ({
     label: labels[i] || ("Colonna " + (i + 1)),
-    value: i === 0
-      ? (value !== "" ? formatDateTime(value) : "n.d.")
-      : (value !== "" ? value : "n.d.")
+    value: value !== "" ? value : "n.d."
   }));
 }
 
@@ -436,8 +413,10 @@ async function loadAll() {
       "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
 
     document.getElementById("humidityDetails").innerHTML = `
-<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
-<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
+<div class="details">
+  <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
+  <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
+</div>
 `;
 
     // --- Card 3: mare ---
