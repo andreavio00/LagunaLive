@@ -32,15 +32,18 @@
 <div class="card">
     <h2>💧 Umidità e temperatura percepita</h2>
 
-    <div class="metric-block">
-        <div class="metric-label">Umidità</div>
-        <div class="metric-value" id="humidity">--</div>
+    <div class="dual-metric">
+        <div class="dual-col">
+            <div class="dual-label">Umidità</div>
+            <div class="dual-value" id="humidity">--</div>
+        </div>
+        <div class="dual-col">
+            <div class="dual-label">Temperatura percepita</div>
+            <div class="dual-value" id="heatIndex">--</div>
+        </div>
     </div>
 
-    <div class="metric-block">
-        <div class="metric-label">Percepita</div>
-        <div class="metric-value" id="heatIndex">--</div>
-    </div>
+    <div class="main-caption" id="humidityStation">Osservatorio Cavanis &middot; --</div>
 
     <div id="humidityDetails" class="details"></div>
 </div>

@@ -45,18 +45,6 @@ const PUNTA_SALUTE_LABELS = [
   "Temperatura acqua (°C)"
 ];
 
-function median(values) {
-  values.sort((a, b) => a - b);
-
-  const middle = Math.floor(values.length / 2);
-
-  if (values.length % 2 === 0) {
-    return (values[middle - 1] + values[middle]) / 2;
-  }
-
-  return values[middle];
-}
-
 function formatTime(timestamp) {
 
   const date = new Date(
@@ -203,24 +191,13 @@ async function loadCavanis() {
   const humidityRows =
     data.filter(r => r.tipo === "UMID2M");
 
-  // Il nome esatto del tipo per la pioggia nell'API ARPA non e'
-  // documentato: proviamo le sigle piu' comuni usate da ARPA Veneto.
-  const rainRows =
-    data.filter(r =>
-      r.tipo === "PREC" ||
-      r.tipo === "PRECIP" ||
-      r.tipo === "PIOGGIA"
-    );
-
   const lastTemp = tempRows[tempRows.length - 1];
   const lastHumidity = humidityRows[humidityRows.length - 1];
-  const lastRain = rainRows.length ? rainRows[rainRows.length - 1] : null;
 
   return {
     timestamp: lastTemp.dataora,
     temperature: parseFloat(lastTemp.valore),
-    humidity: parseFloat(lastHumidity.valore),
-    rain: lastRain ? parseFloat(lastRain.valore) : null
+    humidity: parseFloat(lastHumidity.valore)
   };
 }
 
@@ -406,12 +383,6 @@ async function loadAll() {
       loadTide()
     ]);
 
-    const humidity = median([
-      cavalli.humidity,
-      sanGiorgio.humidity,
-      cavanis.humidity
-    ]);
-
     // --- Card 1: temperatura, Cavanis come stazione principale ---
 
     document.getElementById("temp").innerHTML =
@@ -438,12 +409,13 @@ async function loadAll() {
     document.getElementById("heatIndex").innerHTML =
       hi.toFixed(1) + " °C";
 
+    document.getElementById("humidityStation").innerHTML =
+      "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
+
     document.getElementById("humidityDetails").innerHTML = `
 <div class="details">
   <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
   <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
-  <div>Cavanis: ${cavanis.humidity.toFixed(0)} % (${formatTime(cavanis.timestamp)})</div>
-  <div>Mediana (3 sensori): ${humidity.toFixed(0)} %</div>
 </div>
 `;
 
@@ -471,18 +443,10 @@ async function loadAll() {
       Math.round(sanGiorgio.windSpeed * 3.6) +
       " km/h";
 
-    const cavanisRain =
-      cavanis.rain != null && !isNaN(cavanis.rain)
-        ? cavanis.rain.toFixed(1) + " mm"
-        : "n.d.";
-
-    const cavalliRain =
+    document.getElementById("rain").innerHTML =
       cavalli.rain != null && !isNaN(cavalli.rain)
         ? cavalli.rain.toFixed(1) + " mm"
         : "n.d.";
-
-    document.getElementById("rain").innerHTML =
-      "Cavanis " + cavanisRain + " · Cavalli " + cavalliRain;
 
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) + " hPa";
