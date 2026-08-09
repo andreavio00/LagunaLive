@@ -1,9 +1,50 @@
-body{font-family:Arial,sans-serif;padding:20px;background:#f5f7fa}.card{background:white;padding:12px;margin:10px 0;border-radius:10px}
+body {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  background: #f5f7fa;
+}
+
+h1 {
+  margin-bottom: 4px;
+}
+
+#status {
+  color: #666;
+  font-size: 0.9em;
+  margin-bottom: 10px;
+  min-height: 1.2em;
+}
+
+.card {
+  background: white;
+  padding: 14px 16px;
+  margin: 10px 0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.card h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.05em;
+}
+
+.value {
+  font-size: 1.8em;
+  font-weight: bold;
+}
+
+.subvalue {
+  font-size: 1em;
+  color: #444;
+  margin-top: 2px;
+}
+
 .timestamp {
   font-size: 0.8em;
   color: #666;
   margin-top: 4px;
 }
+
 .details {
   margin-top: 8px;
   font-size: 0.9em;
@@ -12,4 +53,118 @@ body{font-family:Arial,sans-serif;padding:20px;background:#f5f7fa}.card{backgrou
 
 .details div {
   margin: 2px 0;
+}
+
+/* --- Card temperatura principale --- */
+
+.main-temp {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+  margin: -4px -4px 8px -4px;
+  transition: background 0.15s ease;
+}
+
+.main-temp:hover,
+.main-temp:active {
+  background: #f0f4ff;
+}
+
+.main-temp-value {
+  font-size: 3em;
+  font-weight: bold;
+  line-height: 1.1;
+  color: #1a3c8f;
+}
+
+.main-temp-station {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 2px;
+}
+
+.sub-stations {
+  border-top: 1px solid #eee;
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+.sub-station {
+  font-size: 0.9em;
+  color: #333;
+  padding: 4px 2px;
+  border-radius: 6px;
+}
+
+.sub-station.clickable {
+  cursor: pointer;
+}
+
+.sub-station.clickable:hover,
+.sub-station.clickable:active {
+  background: #f0f4ff;
+}
+
+/* --- Modale --- */
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: transparent;
+  font-size: 1.2em;
+  cursor: pointer;
+  color: #666;
+  line-height: 1;
+  padding: 4px;
+}
+
+.modal h2 {
+  margin: 0 0 12px 0;
+  padding-right: 24px;
+}
+
+.modal-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.95em;
+}
+
+.modal-label {
+  color: #666;
+}
+
+.modal-value {
+  font-weight: bold;
+  text-align: right;
 }

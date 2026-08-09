@@ -1,3 +1,21 @@
+const CAVANIS_URL =
+  "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
+
+const PALAZZO_CAVALLI_URL =
+  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
+
+const SAN_GIORGIO_URL =
+  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html";
+
+const PUNTA_SALUTE_URL =
+  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html";
+
+const MISERICORDIA_URL =
+  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html";
+
+const CAVANIS_API_URL =
+  "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
+
 function median(values) {
   values.sort((a, b) => a - b);
 
@@ -35,12 +53,90 @@ function windDirection(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
+// Indice di calore (heat index), formula di Rothfusz (NWS).
+// Sotto i 27°C circa l'effetto e' trascurabile, quindi restituiamo
+// semplicemente la temperatura reale.
+function heatIndex(tempC, humidity) {
+
+  if (tempC < 27 || humidity == null || isNaN(humidity)) {
+    return tempC;
+  }
+
+  const T = tempC * 9 / 5 + 32; // Fahrenheit
+  const R = humidity;
+
+  let HI =
+    -42.379 +
+    2.04901523 * T +
+    10.14333127 * R -
+    0.22475541 * T * R -
+    0.00683783 * T * T -
+    0.05481717 * R * R +
+    0.00122874 * T * T * R +
+    0.00085282 * T * R * R -
+    0.00000199 * T * T * R * R;
+
+  return (HI - 32) * 5 / 9; // torna in Celsius
+}
+
+// Estrae in modo generico tutte le colonne dell'ultima riga di una
+// tabella CPSM (renderizzata in markdown da r.jina.ai), usando l'header
+// della tabella come etichette. Serve per la "scheda" con tutti i dati.
+function parseCPSMTableFull(text) {
+
+  const lines = text.split("\n");
+
+  const dataLineIndices = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\|\s*\d{4}-\d{2}-\d{2}/.test(lines[i])) {
+      dataLineIndices.push(i);
+    }
+  }
+
+  if (dataLineIndices.length === 0) {
+    return null;
+  }
+
+  const lastDataIndex = dataLineIndices[dataLineIndices.length - 1];
+
+  let headerLine = null;
+
+  for (let i = lastDataIndex - 1; i >= 0; i--) {
+
+    const line = lines[i].trim();
+
+    if (!line.startsWith("|")) continue;
+    if (/^\|[\s:\-|]+\|?$/.test(line)) continue; // riga separatore |---|---|
+
+    headerLine = line;
+    break;
+  }
+
+  const splitCells = (line) =>
+    line
+      .split("|")
+      .map(c => c.trim())
+      .filter((c, idx, arr) => {
+        if (idx === 0 && c === "") return false;
+        if (idx === arr.length - 1 && c === "") return false;
+        return true;
+      });
+
+  const values = splitCells(lines[lastDataIndex]);
+  const headers = headerLine
+    ? splitCells(headerLine)
+    : values.map((_, i) => "Colonna " + (i + 1));
+
+  return headers.map((h, i) => ({
+    label: h || ("Colonna " + (i + 1)),
+    value: values[i] !== undefined && values[i] !== "" ? values[i] : "n.d."
+  }));
+}
+
 async function loadPalazzoCavalli() {
 
-  const url =
-    "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
-
-  const response = await fetch(url);
+  const response = await fetch(PALAZZO_CAVALLI_URL);
   const text = await response.text();
 
   const rows = text
@@ -63,10 +159,7 @@ async function loadPalazzoCavalli() {
 
 async function loadSanGiorgio() {
 
-  const url =
-    "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html";
-
-  const response = await fetch(url);
+  const response = await fetch(SAN_GIORGIO_URL);
   const text = await response.text();
 
   const rows = text
@@ -91,10 +184,7 @@ async function loadSanGiorgio() {
 
 async function loadCavanis() {
 
-  const url =
-    "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
-
-  const response = await fetch(url);
+  const response = await fetch(CAVANIS_API_URL);
   const json = await response.json();
 
   const data = json.data;
@@ -117,10 +207,7 @@ async function loadCavanis() {
 
 async function loadPuntaSalute() {
 
-  const url =
-"https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html";
-
-  const response = await fetch(url);
+  const response = await fetch(PUNTA_SALUTE_URL);
   const text = await response.text();
 
   const rows = text
@@ -156,10 +243,7 @@ async function loadPuntaSalute() {
 
 async function loadMisericordia() {
 
-  const url =
-    "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html";
-
-  const response = await fetch(url);
+  const response = await fetch(MISERICORDIA_URL);
   const text = await response.text();
 
   const rows = text
@@ -186,12 +270,27 @@ async function loadMisericordia() {
   if (tide < prevTide) trend = "↓";
 
   return {
-  timestamp: cols[1],
-  tide,
-  trend,
-  source: "Misericordia",
-  waterTemp: null
-};
+    timestamp: cols[1],
+    tide,
+    trend,
+    source: "Misericordia",
+    waterTemp: null
+  };
+}
+
+async function loadTide() {
+
+  try {
+
+    const puntaSalute = await loadPuntaSalute();
+    puntaSalute.source = "Punta Salute";
+    return puntaSalute;
+
+  } catch (err) {
+
+    console.warn("Punta Salute non disponibile, uso Misericordia");
+    return await loadMisericordia();
+  }
 }
 
 async function loadStationsConfig() {
@@ -205,91 +304,162 @@ async function loadStationsConfig() {
       .join("<br>");
 }
 
-async function loadAll() {
+// --- Modale "scheda" Palazzo Cavalli ---
+
+function showModal(title, bodyHtml) {
+
+  document.getElementById("modalTitle").innerHTML = title;
+  document.getElementById("modalBody").innerHTML = bodyHtml;
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+function hideModal() {
+  document.getElementById("modalOverlay").classList.remove("open");
+}
+
+async function openPalazzoCavalliModal() {
+
+  showModal("Palazzo Cavalli", "<p>Caricamento dati aggiornati...</p>");
 
   try {
 
-    const cavalli = await loadPalazzoCavalli();
-const sanGiorgio = await loadSanGiorgio();
-const cavanis = await loadCavanis();
+    const response = await fetch(PALAZZO_CAVALLI_URL);
+    const text = await response.text();
 
-let puntaSalute;
+    const rows = parseCPSMTableFull(text);
 
-try {
+    if (!rows) {
+      throw new Error("Tabella non trovata");
+    }
 
-  puntaSalute = await loadPuntaSalute();
-  puntaSalute.source = "Punta Salute";
+    const html = rows
+      .map(r =>
+        `<div class="modal-row"><span class="modal-label">${r.label}</span><span class="modal-value">${r.value}</span></div>`
+      )
+      .join("");
 
-} catch (err) {
+    showModal("Palazzo Cavalli — tutti i dati", html);
 
-  console.warn("Punta Salute non disponibile");
+  } catch (err) {
 
-  puntaSalute = await loadMisericordia();
+    console.error(err);
+    showModal("Palazzo Cavalli", "<p>Errore nel caricamento dei dati.</p>");
+  }
 }
 
-    const temp = median([
-  cavalli.temperature,
-  sanGiorgio.temperature,
-  cavanis.temperature
-]);
+function setupInteractions() {
+
+  document.getElementById("mainTempLink").addEventListener("click", () => {
+    window.open(CAVANIS_URL, "_blank");
+  });
+
+  document.getElementById("subCavalli").addEventListener("click", () => {
+    openPalazzoCavalliModal();
+  });
+
+  document.getElementById("modalClose").addEventListener("click", hideModal);
+
+  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalOverlay") hideModal();
+  });
+}
+
+async function loadAll() {
+
+  document.getElementById("status").innerHTML = "Caricamento...";
+
+  try {
+
+    // Tutte le stazioni vengono interrogate in parallelo invece che in
+    // sequenza: questo e' il cambiamento principale per velocizzare il
+    // caricamento della pagina.
+    const [cavalli, sanGiorgio, cavanis, puntaSalute] = await Promise.all([
+      loadPalazzoCavalli(),
+      loadSanGiorgio(),
+      loadCavanis(),
+      loadTide()
+    ]);
 
     const humidity = median([
-  cavalli.humidity,
-  sanGiorgio.humidity,
-  cavanis.humidity
-]);
+      cavalli.humidity,
+      sanGiorgio.humidity,
+      cavanis.humidity
+    ]);
 
-    document.getElementById("tide").innerHTML =
-      puntaSalute.tide +
-      " cm " +
-      puntaSalute.trend;
-
-    document.getElementById("waterTemp").innerHTML =
-  puntaSalute.waterTemp != null
-    ? puntaSalute.waterTemp.toFixed(1) + " °C"
-    : "n.d.";
+    // --- Card 1: temperatura, Cavanis come stazione principale ---
 
     document.getElementById("temp").innerHTML =
-      temp.toFixed(1) +
-      " °C<br><small>(3 sensori)</small>";
+      cavanis.temperature.toFixed(1) + " °C";
 
-document.getElementById("tempDetails").innerHTML =
-`
-<div class="details">
-  <div>Palazzo Cavalli: ${cavalli.temperature.toFixed(1)} °C (${formatTime(cavalli.timestamp)})</div>
-  <div>San Giorgio: ${sanGiorgio.temperature.toFixed(1)} °C (${formatTime(sanGiorgio.timestamp)})</div>
-  <div>Cavanis: ${cavanis.temperature.toFixed(1)} °C (${formatTime(cavanis.timestamp)})</div>
-</div>
-`;
+    document.getElementById("tempStation").innerHTML =
+      "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
+
+    const subCavalli = document.getElementById("subCavalli");
+    subCavalli.innerHTML =
+      "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
+      " °C (" + formatTime(cavalli.timestamp) + ")";
+    subCavalli.classList.add("clickable");
+
+    document.getElementById("subSanGiorgio").innerHTML =
+      "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
+      " °C (" + formatTime(sanGiorgio.timestamp) + ")";
+
+    // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
+
     document.getElementById("humidity").innerHTML =
-      humidity.toFixed(0) +
-      " %<br><small>(3 sensori)</small>";
+      cavanis.humidity.toFixed(0) + " %";
 
-document.getElementById("humidityDetails").innerHTML =
-`
+    const hi = heatIndex(cavanis.temperature, cavanis.humidity);
+
+    document.getElementById("heatIndex").innerHTML =
+      "Percepita: " + hi.toFixed(1) + " °C";
+
+    document.getElementById("humidityDetails").innerHTML = `
 <div class="details">
   <div>Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
   <div>San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
   <div>Cavanis: ${cavanis.humidity.toFixed(0)} % (${formatTime(cavanis.timestamp)})</div>
+  <div>Mediana (3 sensori): ${humidity.toFixed(0)} %</div>
 </div>
 `;
-    document.getElementById("pressure").innerHTML =
-      cavalli.pressure.toFixed(1) +
-      " hPa";
+
+    // --- Card 3: mare ---
+
+    document.getElementById("tide").innerHTML =
+      puntaSalute.tide + " cm " + puntaSalute.trend;
+
+    document.getElementById("tideSource").innerHTML =
+      puntaSalute.source;
+
+    document.getElementById("tideTime").innerHTML =
+      formatTime(puntaSalute.timestamp);
+
+    document.getElementById("waterTemp").innerHTML =
+      puntaSalute.waterTemp != null
+        ? puntaSalute.waterTemp.toFixed(1) + " °C"
+        : "n.d.";
+
+    // --- Card 4: vento e pioggia ---
 
     document.getElementById("wind").innerHTML =
       windDirection(sanGiorgio.windDir) +
       " " +
       Math.round(sanGiorgio.windSpeed * 3.6) +
       " km/h";
-document.getElementById("tideSource").innerHTML =
-  puntaSalute.source;
-   document.getElementById("tideTime").innerHTML =
-  formatTime(puntaSalute.timestamp);
 
-document.getElementById("airTime").innerHTML =
-  formatTime(cavalli.timestamp);
- document.getElementById("status").innerHTML = "";
+    // Nota: nessuna delle stazioni attualmente utilizzate fornisce un dato
+    // di pioggia, quindi il campo resta "n.d." finche' non si individua una
+    // fonte affidabile.
+
+    // --- Pressione ---
+
+    document.getElementById("pressure").innerHTML =
+      cavalli.pressure.toFixed(1) + " hPa";
+
+    document.getElementById("airTime").innerHTML =
+      formatTime(cavalli.timestamp);
+
+    document.getElementById("status").innerHTML = "";
 
   } catch (error) {
 
@@ -300,5 +470,6 @@ document.getElementById("airTime").innerHTML =
   }
 }
 
+setupInteractions();
 loadStationsConfig();
 loadAll();

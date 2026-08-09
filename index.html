@@ -13,33 +13,52 @@
 
 <div id="status">Caricamento...</div>
 
+<!-- CARD 1: Temperatura -->
 <div class="card">
-    <h2>🌊 Marea</h2>
-    <div class="value" id="tide">--</div>
+    <h2>🌡️ Temperatura</h2>
 
-    <div id="tideTime"></div>
-    <div id="tideSource"></div>
+    <div class="main-temp" id="mainTempLink">
+        <div class="main-temp-value" id="temp">--</div>
+        <div class="main-temp-station" id="tempStation">Osservatorio Cavanis &middot; --</div>
+    </div>
+
+    <div class="sub-stations">
+        <div class="sub-station" id="subCavalli">Palazzo Cavalli: -- (--)</div>
+        <div class="sub-station" id="subSanGiorgio">San Giorgio: -- (--)</div>
+    </div>
 </div>
 
+<!-- CARD 2: Umidità e percepita -->
 <div class="card">
-    <h2>🌊 Temperatura acqua</h2>
-    <div class="value" id="waterTemp">--</div>
-</div>
-
-<div class="card">
-    <h2>🌡️ Temperatura Venezia</h2>
-
-    <div class="value" id="temp">--</div>
-
-    <div id="tempDetails"></div>
-</div>
-
-<div class="card">
-    <h2>💧 Umidità</h2>
+    <h2>💧 Umidità e temperatura percepita</h2>
 
     <div class="value" id="humidity">--</div>
+    <div id="heatIndex" class="subvalue"></div>
 
     <div id="humidityDetails"></div>
+</div>
+
+<!-- CARD 3: Mare -->
+<div class="card">
+    <h2>🌊 Mare</h2>
+
+    <div class="value" id="tide">--</div>
+    <div id="tideTime"></div>
+    <div id="tideSource"></div>
+
+    <div class="details">
+        <div>Temperatura acqua: <span id="waterTemp">--</span></div>
+    </div>
+</div>
+
+<!-- CARD 4: Vento e pioggia -->
+<div class="card">
+    <h2>💨 Vento e pioggia</h2>
+
+    <div class="value" id="wind">--</div>
+    <div class="details">
+        <div id="rain">Pioggia: n.d.</div>
+    </div>
 </div>
 
 <div class="card">
@@ -51,16 +70,19 @@
 </div>
 
 <div class="card">
-    <h2>💨 Vento</h2>
-
-    <div class="value" id="wind">--</div>
-</div>
-
-<div class="card">
     <h2>📡 Stazioni utilizzate</h2>
 
     <div id="stationsStatus">
         Caricamento...
+    </div>
+</div>
+
+<!-- Modale scheda Palazzo Cavalli -->
+<div id="modalOverlay" class="modal-overlay">
+    <div class="modal">
+        <button id="modalClose" class="modal-close" aria-label="Chiudi">✕</button>
+        <h2 id="modalTitle">Palazzo Cavalli</h2>
+        <div id="modalBody"></div>
     </div>
 </div>
 
