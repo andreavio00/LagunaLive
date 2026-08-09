@@ -17,14 +17,14 @@
 <div class="card">
     <h2>🌡️ Temperatura</h2>
 
-    <div class="main-temp" id="mainTempLink">
+    <div class="main-temp clickable" id="mainTempLink">
         <div class="main-temp-value" id="temp">--</div>
         <div class="main-temp-station" id="tempStation">Osservatorio Cavanis &middot; --</div>
     </div>
 
     <div class="sub-stations">
-        <div class="sub-station" id="subCavalli">Palazzo Cavalli: -- (--)</div>
-        <div class="sub-station" id="subSanGiorgio">San Giorgio: -- (--)</div>
+        <div class="sub-station clickable" id="subCavalli">Palazzo Cavalli: -- (--)</div>
+        <div class="sub-station clickable" id="subSanGiorgio">San Giorgio: -- (--)</div>
     </div>
 </div>
 
@@ -32,41 +32,48 @@
 <div class="card">
     <h2>💧 Umidità e temperatura percepita</h2>
 
-    <div class="value" id="humidity">--</div>
-    <div id="heatIndex" class="subvalue"></div>
+    <div class="metric-block">
+        <div class="metric-label">Umidità</div>
+        <div class="metric-value" id="humidity">--</div>
+    </div>
 
-    <div id="humidityDetails"></div>
+    <div class="metric-block">
+        <div class="metric-label">Percepita</div>
+        <div class="metric-value" id="heatIndex">--</div>
+    </div>
+
+    <div id="humidityDetails" class="details"></div>
 </div>
 
 <!-- CARD 3: Mare -->
 <div class="card">
     <h2>🌊 Mare</h2>
 
-    <div class="value" id="tide">--</div>
-    <div id="tideTime"></div>
-    <div id="tideSource"></div>
-
-    <div class="details">
-        <div>Temperatura acqua: <span id="waterTemp">--</span></div>
+    <div class="mare-main clickable" id="mareLink">
+        <span class="mare-value" id="tide">--</span>
+        <span class="mare-value" id="waterTemp">--</span>
     </div>
+
+    <div id="tideTime" class="timestamp"></div>
+    <div id="tideSource" class="timestamp"></div>
 </div>
 
-<!-- CARD 4: Vento e pioggia -->
+<!-- CARD 4: Vento, pioggia, pressione -->
 <div class="card">
-    <h2>💨 Vento e pioggia</h2>
-
-    <div class="value" id="wind">--</div>
-    <div class="details">
-        <div id="rain">Pioggia: n.d.</div>
+    <div class="metric-line">
+        <span class="metric-name">Vento</span>
+        <span class="metric-data" id="wind">--</span>
     </div>
-</div>
+    <div class="metric-line">
+        <span class="metric-name">Pioggia</span>
+        <span class="metric-data" id="rain">--</span>
+    </div>
+    <div class="metric-line">
+        <span class="metric-name">Pressione</span>
+        <span class="metric-data" id="pressure">--</span>
+    </div>
 
-<div class="card">
-    <h2>📈 Pressione</h2>
-
-    <div class="value" id="pressure">--</div>
-
-    <div id="airTime"></div>
+    <div id="airTime" class="timestamp"></div>
 </div>
 
 <div class="card">
@@ -77,11 +84,11 @@
     </div>
 </div>
 
-<!-- Modale scheda Palazzo Cavalli -->
+<!-- Modale scheda stazione -->
 <div id="modalOverlay" class="modal-overlay">
     <div class="modal">
         <button id="modalClose" class="modal-close" aria-label="Chiudi">✕</button>
-        <h2 id="modalTitle">Palazzo Cavalli</h2>
+        <h2 id="modalTitle">Stazione</h2>
         <div id="modalBody"></div>
     </div>
 </div>

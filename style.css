@@ -33,12 +33,6 @@ h1 {
   font-weight: bold;
 }
 
-.subvalue {
-  font-size: 1em;
-  color: #444;
-  margin-top: 2px;
-}
-
 .timestamp {
   font-size: 0.8em;
   color: #666;
@@ -55,19 +49,23 @@ h1 {
   margin: 2px 0;
 }
 
-/* --- Card temperatura principale --- */
-
-.main-temp {
+.clickable {
   cursor: pointer;
   border-radius: 8px;
-  padding: 4px;
-  margin: -4px -4px 8px -4px;
   transition: background 0.15s ease;
 }
 
-.main-temp:hover,
-.main-temp:active {
+.clickable:hover,
+.clickable:active {
   background: #f0f4ff;
+}
+
+/* --- Card temperatura principale --- */
+
+.main-temp {
+  text-align: center;
+  padding: 6px 4px;
+  margin: -4px -4px 8px -4px;
 }
 
 .main-temp-value {
@@ -92,17 +90,67 @@ h1 {
 .sub-station {
   font-size: 0.9em;
   color: #333;
-  padding: 4px 2px;
-  border-radius: 6px;
+  padding: 4px 6px;
+  margin: 2px -6px;
 }
 
-.sub-station.clickable {
-  cursor: pointer;
+/* --- Card umidita' / percepita --- */
+
+.metric-block {
+  margin: 10px 0;
 }
 
-.sub-station.clickable:hover,
-.sub-station.clickable:active {
-  background: #f0f4ff;
+.metric-label {
+  font-weight: bold;
+  font-size: 0.95em;
+  color: #333;
+}
+
+.metric-value {
+  font-weight: bold;
+  font-size: 1.6em;
+  color: #1a3c8f;
+}
+
+/* --- Card mare --- */
+
+.mare-main {
+  display: flex;
+  justify-content: space-around;
+  align-items: baseline;
+  padding: 6px 4px;
+  margin: 0 -4px;
+}
+
+.mare-value {
+  font-weight: bold;
+  font-size: 1.6em;
+  color: #1a3c8f;
+}
+
+/* --- Card vento / pioggia / pressione --- */
+
+.metric-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.metric-line:last-of-type {
+  border-bottom: none;
+}
+
+.metric-name {
+  font-size: 1em;
+  color: #555;
+}
+
+.metric-data {
+  font-weight: bold;
+  font-size: 1.2em;
+  color: #1a3c8f;
 }
 
 /* --- Modale --- */

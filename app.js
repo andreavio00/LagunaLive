@@ -16,6 +16,35 @@ const MISERICORDIA_URL =
 const CAVANIS_API_URL =
   "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
 
+// Etichette delle colonne cosi' come compaiono nelle tabelle delle
+// stazioni CPSM (prima colonna = data/ora, poi le altre nell'ordine in
+// cui il sito del Comune le pubblica). Usate per la "scheda" con i
+// dati completi di ogni stazione.
+const PALAZZO_CAVALLI_LABELS = [
+  "Data/Ora",
+  "Pressione (hPa)",
+  "Temperatura (°C)",
+  "Umidità (%)",
+  "Radiazione solare (W/mq)",
+  "Pioggia (mm)"
+];
+
+const SAN_GIORGIO_LABELS = [
+  "Data/Ora",
+  "Direzione vento (°)",
+  "Velocità vento (m/s)",
+  "Raffica vento (m/s)",
+  "Temperatura (°C)",
+  "Umidità (%)",
+  "Radiazione solare (W/mq)"
+];
+
+const PUNTA_SALUTE_LABELS = [
+  "Data/Ora",
+  "Marea (m)",
+  "Temperatura acqua (°C)"
+];
+
 function median(values) {
   values.sort((a, b) => a - b);
 
@@ -79,58 +108,35 @@ function heatIndex(tempC, humidity) {
   return (HI - 32) * 5 / 9; // torna in Celsius
 }
 
-// Estrae in modo generico tutte le colonne dell'ultima riga di una
-// tabella CPSM (renderizzata in markdown da r.jina.ai), usando l'header
-// della tabella come etichette. Serve per la "scheda" con tutti i dati.
-function parseCPSMTableFull(text) {
+// Le tabelle delle stazioni CPSM non hanno una riga di intestazione
+// testuale: sono solo righe di dati ripetute. Per la "scheda" prendiamo
+// quindi solo l'ULTIMA riga (il dato piu' recente) e la abbiniamo alle
+// etichette note per quella stazione, invece di mostrare piu' righe di
+// dati che confonderebbero l'utente.
+function parseLastRowLabeled(text, labels) {
 
-  const lines = text.split("\n");
+  const dataLines = text
+    .split("\n")
+    .filter(line => /^\|\s*\d{4}-\d{2}-\d{2}/.test(line));
 
-  const dataLineIndices = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\|\s*\d{4}-\d{2}-\d{2}/.test(lines[i])) {
-      dataLineIndices.push(i);
-    }
-  }
-
-  if (dataLineIndices.length === 0) {
+  if (dataLines.length === 0) {
     return null;
   }
 
-  const lastDataIndex = dataLineIndices[dataLineIndices.length - 1];
+  const lastRow = dataLines[dataLines.length - 1];
 
-  let headerLine = null;
+  const cells = lastRow
+    .split("|")
+    .map(c => c.trim())
+    .filter((c, idx, arr) => {
+      if (idx === 0 && c === "") return false;
+      if (idx === arr.length - 1 && c === "") return false;
+      return true;
+    });
 
-  for (let i = lastDataIndex - 1; i >= 0; i--) {
-
-    const line = lines[i].trim();
-
-    if (!line.startsWith("|")) continue;
-    if (/^\|[\s:\-|]+\|?$/.test(line)) continue; // riga separatore |---|---|
-
-    headerLine = line;
-    break;
-  }
-
-  const splitCells = (line) =>
-    line
-      .split("|")
-      .map(c => c.trim())
-      .filter((c, idx, arr) => {
-        if (idx === 0 && c === "") return false;
-        if (idx === arr.length - 1 && c === "") return false;
-        return true;
-      });
-
-  const values = splitCells(lines[lastDataIndex]);
-  const headers = headerLine
-    ? splitCells(headerLine)
-    : values.map((_, i) => "Colonna " + (i + 1));
-
-  return headers.map((h, i) => ({
-    label: h || ("Colonna " + (i + 1)),
-    value: values[i] !== undefined && values[i] !== "" ? values[i] : "n.d."
+  return cells.map((value, i) => ({
+    label: labels[i] || ("Colonna " + (i + 1)),
+    value: value !== "" ? value : "n.d."
   }));
 }
 
@@ -153,7 +159,9 @@ async function loadPalazzoCavalli() {
     timestamp: cols[1],
     pressure: parseFloat(cols[2]),
     temperature: parseFloat(cols[3]),
-    humidity: parseFloat(cols[4])
+    humidity: parseFloat(cols[4]),
+    radiation: parseFloat(cols[5]),
+    rain: parseFloat(cols[6])
   };
 }
 
@@ -195,13 +203,24 @@ async function loadCavanis() {
   const humidityRows =
     data.filter(r => r.tipo === "UMID2M");
 
+  // Il nome esatto del tipo per la pioggia nell'API ARPA non e'
+  // documentato: proviamo le sigle piu' comuni usate da ARPA Veneto.
+  const rainRows =
+    data.filter(r =>
+      r.tipo === "PREC" ||
+      r.tipo === "PRECIP" ||
+      r.tipo === "PIOGGIA"
+    );
+
   const lastTemp = tempRows[tempRows.length - 1];
   const lastHumidity = humidityRows[humidityRows.length - 1];
+  const lastRain = rainRows.length ? rainRows[rainRows.length - 1] : null;
 
   return {
     timestamp: lastTemp.dataora,
     temperature: parseFloat(lastTemp.valore),
-    humidity: parseFloat(lastHumidity.valore)
+    humidity: parseFloat(lastHumidity.valore),
+    rain: lastRain ? parseFloat(lastRain.valore) : null
   };
 }
 
@@ -304,7 +323,7 @@ async function loadStationsConfig() {
       .join("<br>");
 }
 
-// --- Modale "scheda" Palazzo Cavalli ---
+// --- Modale "scheda" stazione ---
 
 function showModal(title, bodyHtml) {
 
@@ -317,19 +336,19 @@ function hideModal() {
   document.getElementById("modalOverlay").classList.remove("open");
 }
 
-async function openPalazzoCavalliModal() {
+async function openStationModal(title, url, labels) {
 
-  showModal("Palazzo Cavalli", "<p>Caricamento dati aggiornati...</p>");
+  showModal(title, "<p>Caricamento dati aggiornati...</p>");
 
   try {
 
-    const response = await fetch(PALAZZO_CAVALLI_URL);
+    const response = await fetch(url);
     const text = await response.text();
 
-    const rows = parseCPSMTableFull(text);
+    const rows = parseLastRowLabeled(text, labels);
 
     if (!rows) {
-      throw new Error("Tabella non trovata");
+      throw new Error("Dati non trovati");
     }
 
     const html = rows
@@ -338,12 +357,12 @@ async function openPalazzoCavalliModal() {
       )
       .join("");
 
-    showModal("Palazzo Cavalli — tutti i dati", html);
+    showModal(title, html);
 
   } catch (err) {
 
     console.error(err);
-    showModal("Palazzo Cavalli", "<p>Errore nel caricamento dei dati.</p>");
+    showModal(title, "<p>Errore nel caricamento dei dati.</p>");
   }
 }
 
@@ -354,7 +373,15 @@ function setupInteractions() {
   });
 
   document.getElementById("subCavalli").addEventListener("click", () => {
-    openPalazzoCavalliModal();
+    openStationModal("Palazzo Cavalli", PALAZZO_CAVALLI_URL, PALAZZO_CAVALLI_LABELS);
+  });
+
+  document.getElementById("subSanGiorgio").addEventListener("click", () => {
+    openStationModal("San Giorgio", SAN_GIORGIO_URL, SAN_GIORGIO_LABELS);
+  });
+
+  document.getElementById("mareLink").addEventListener("click", () => {
+    openStationModal("Punta della Dogana (Punta Salute)", PUNTA_SALUTE_URL, PUNTA_SALUTE_LABELS);
   });
 
   document.getElementById("modalClose").addEventListener("click", hideModal);
@@ -371,8 +398,7 @@ async function loadAll() {
   try {
 
     // Tutte le stazioni vengono interrogate in parallelo invece che in
-    // sequenza: questo e' il cambiamento principale per velocizzare il
-    // caricamento della pagina.
+    // sequenza, per velocizzare il caricamento della pagina.
     const [cavalli, sanGiorgio, cavanis, puntaSalute] = await Promise.all([
       loadPalazzoCavalli(),
       loadSanGiorgio(),
@@ -394,11 +420,9 @@ async function loadAll() {
     document.getElementById("tempStation").innerHTML =
       "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
 
-    const subCavalli = document.getElementById("subCavalli");
-    subCavalli.innerHTML =
+    document.getElementById("subCavalli").innerHTML =
       "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
       " °C (" + formatTime(cavalli.timestamp) + ")";
-    subCavalli.classList.add("clickable");
 
     document.getElementById("subSanGiorgio").innerHTML =
       "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
@@ -412,7 +436,7 @@ async function loadAll() {
     const hi = heatIndex(cavanis.temperature, cavanis.humidity);
 
     document.getElementById("heatIndex").innerHTML =
-      "Percepita: " + hi.toFixed(1) + " °C";
+      hi.toFixed(1) + " °C";
 
     document.getElementById("humidityDetails").innerHTML = `
 <div class="details">
@@ -428,18 +452,18 @@ async function loadAll() {
     document.getElementById("tide").innerHTML =
       puntaSalute.tide + " cm " + puntaSalute.trend;
 
+    document.getElementById("waterTemp").innerHTML =
+      puntaSalute.waterTemp != null
+        ? puntaSalute.waterTemp.toFixed(1) + " °C"
+        : "n.d.";
+
     document.getElementById("tideSource").innerHTML =
       puntaSalute.source;
 
     document.getElementById("tideTime").innerHTML =
       formatTime(puntaSalute.timestamp);
 
-    document.getElementById("waterTemp").innerHTML =
-      puntaSalute.waterTemp != null
-        ? puntaSalute.waterTemp.toFixed(1) + " °C"
-        : "n.d.";
-
-    // --- Card 4: vento e pioggia ---
+    // --- Card 4: vento, pioggia, pressione ---
 
     document.getElementById("wind").innerHTML =
       windDirection(sanGiorgio.windDir) +
@@ -447,11 +471,18 @@ async function loadAll() {
       Math.round(sanGiorgio.windSpeed * 3.6) +
       " km/h";
 
-    // Nota: nessuna delle stazioni attualmente utilizzate fornisce un dato
-    // di pioggia, quindi il campo resta "n.d." finche' non si individua una
-    // fonte affidabile.
+    const cavanisRain =
+      cavanis.rain != null && !isNaN(cavanis.rain)
+        ? cavanis.rain.toFixed(1) + " mm"
+        : "n.d.";
 
-    // --- Pressione ---
+    const cavalliRain =
+      cavalli.rain != null && !isNaN(cavalli.rain)
+        ? cavalli.rain.toFixed(1) + " mm"
+        : "n.d.";
+
+    document.getElementById("rain").innerHTML =
+      "Cavanis " + cavanisRain + " · Cavalli " + cavalliRain;
 
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) + " hPa";
