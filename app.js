@@ -45,6 +45,30 @@ const PUNTA_SALUTE_LABELS = [
   "Temperatura acqua (°C)"
 ];
 
+// Etichette non verificate direttamente sul sito (nessuno screenshot
+// di riferimento come per Cavalli/San Giorgio/Punta Salute): se
+// l'ordine reale delle colonne fosse diverso, le colonne in eccesso
+// compariranno comunque come "Colonna N" invece di rompere la scheda.
+const MISERICORDIA_LABELS = [
+  "Data/Ora",
+  "Marea (m)"
+];
+
+const CNR_LABELS = [
+  "Data/Ora",
+  "Temperatura (°C)",
+  "Umidità (%)",
+  "Temperatura acqua (°C)"
+];
+
+const STATION_LABELS = {
+  punta_salute: PUNTA_SALUTE_LABELS,
+  misericordia: MISERICORDIA_LABELS,
+  palazzo_cavalli: PALAZZO_CAVALLI_LABELS,
+  san_giorgio: SAN_GIORGIO_LABELS,
+  cnr: CNR_LABELS
+};
+
 function formatTime(timestamp) {
 
   const date = new Date(
@@ -115,6 +139,38 @@ function heatIndex(tempC, humidity) {
     0.00000199 * T * T * R * R;
 
   return (HI - 32) * 5 / 9; // torna in Celsius
+}
+
+function vaporPressure(tempC, humidity) {
+  return (humidity / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
+}
+
+// Temperatura percepita "al sole". Il THSW di Davis Instruments e'
+// una formula proprietaria che il produttore non ha mai reso
+// pubblica, quindi non e' riproducibile esattamente. Usiamo qui
+// l'Apparent Temperature di Steadman (1994), la formula pubblica
+// adottata dal Bureau of Meteorology australiano, che e'
+// l'equivalente aperto piu' vicino: include anch'essa temperatura,
+// umidita', vento e radiazione solare.
+function apparentTemperatureSun(tempC, humidity, windSpeedMs, solarRadiation) {
+
+  if (
+    solarRadiation == null || isNaN(solarRadiation) ||
+    windSpeedMs == null || isNaN(windSpeedMs)
+  ) {
+    return heatIndex(tempC, humidity);
+  }
+
+  const e = vaporPressure(tempC, humidity);
+  const Q = Math.max(0, solarRadiation);
+
+  return (
+    tempC +
+    0.348 * e -
+    0.70 * windSpeedMs +
+    0.70 * (Q / (windSpeedMs + 10)) -
+    4.25
+  );
 }
 
 // Le tabelle delle stazioni CPSM non hanno una riga di intestazione
@@ -317,10 +373,30 @@ async function loadStationsConfig() {
   const response = await fetch("stations.json");
   const config = await response.json();
 
-  document.getElementById("stationsStatus").innerHTML =
-    config.stations
-      .map(station => "✓ " + station.name)
-      .join("<br>");
+  const container = document.getElementById("stationsStatus");
+  container.innerHTML = "";
+
+  config.stations.forEach(station => {
+
+    const row = document.createElement("div");
+    row.className = "sub-station clickable";
+    row.textContent = "✓ " + station.name;
+
+    row.addEventListener("click", () => {
+
+      if (station.type === "meteonetwork") {
+        window.open(CAVANIS_URL, "_blank");
+        return;
+      }
+
+      if (station.url) {
+        const labels = STATION_LABELS[station.id] || ["Data/Ora"];
+        openStationModal(station.name, "https://r.jina.ai/" + station.url, labels);
+      }
+    });
+
+    container.appendChild(row);
+  });
 }
 
 // --- Modale "scheda" stazione ---
@@ -432,6 +508,16 @@ async function loadAll() {
     document.getElementById("heatIndex").innerHTML =
       hi.toFixed(1) + " °C";
 
+    const thsw = apparentTemperatureSun(
+      cavanis.temperature,
+      cavanis.humidity,
+      sanGiorgio.windSpeed,
+      cavalli.radiation
+    );
+
+    document.getElementById("thsw").innerHTML =
+      thsw.toFixed(1) + " °C";
+
     document.getElementById("humidityStation").innerHTML =
       "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
 
@@ -450,11 +536,8 @@ async function loadAll() {
         ? puntaSalute.waterTemp.toFixed(1) + " °C"
         : "n.d.";
 
-    document.getElementById("tideSource").innerHTML =
-      puntaSalute.source;
-
-    document.getElementById("tideTime").innerHTML =
-      formatTime(puntaSalute.timestamp);
+    document.getElementById("tideInfo").innerHTML =
+      formatTime(puntaSalute.timestamp) + " &middot; " + puntaSalute.source;
 
     // --- Card 4: vento, pioggia, pressione ---
 

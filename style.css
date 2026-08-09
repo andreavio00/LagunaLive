@@ -106,26 +106,42 @@ h1 {
   margin-bottom: 6px;
 }
 
-.dual-metric {
-  display: flex;
-  justify-content: space-around;
-  text-align: center;
+.triple-metric {
   margin-top: 4px;
 }
 
-.dual-col {
+.triple-row {
+  display: flex;
+}
+
+.triple-row .col-1,
+.triple-row .col-2,
+.triple-row .col-3 {
   flex: 1;
+  text-align: center;
 }
 
-.dual-label {
+.triple-row .col-2-3 {
+  flex: 2;
+  text-align: center;
+}
+
+.triple-label {
   font-weight: bold;
-  font-size: 1.05em;
+  font-size: 0.85em;
   color: #222;
+  white-space: nowrap;
 }
 
-.dual-value {
+.triple-sublabel {
+  font-size: 0.75em;
+  color: #666;
+  margin-top: 4px;
+}
+
+.triple-value {
   font-weight: bold;
-  font-size: 1.6em;
+  font-size: 1.35em;
   color: #1a3c8f;
   margin-top: 4px;
 }
