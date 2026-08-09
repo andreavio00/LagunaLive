@@ -1,4 +1,4 @@
-const CACHE_NAME = "lagunalive-shell-v1";
+const CACHE_NAME = "lagunalive-shell-v2";
 
 // Solo la "cornice" dell'app (HTML/CSS/JS/icone) viene messa in cache:
 // i dati meteo restano sempre presi dalla rete in tempo reale, cosi'
@@ -52,17 +52,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Rete prima, cache come ripiego. In precedenza faceva il contrario
+  // (cache prima, rete solo se mancava): una volta scaricata la prima
+  // volta, la cache restava quella per sempre, quindi ogni aggiornamento
+  // (icona compresa) non veniva mai visto finche' non si svuotava la
+  // cache manualmente. Cosi' invece si vede sempre la versione piu'
+  // recente quando c'e' connessione, e quella salvata solo se offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-
-      const network = fetch(event.request)
-        .then((response) => {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
-          return response;
-        })
-        .catch(() => cached);
-
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((response) => {
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
