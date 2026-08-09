@@ -1,11 +1,14 @@
 body {
   font-family: Arial, sans-serif;
   padding: 20px;
-  background: #f5f7fa;
+  background: linear-gradient(180deg, #e7f1fa 0%, #f5f7fa 220px);
+  background-color: #f5f7fa;
+  min-height: 100vh;
 }
 
 h1 {
   margin-bottom: 4px;
+  color: #14294f;
 }
 
 #status {
@@ -19,8 +22,8 @@ h1 {
   background: white;
   padding: 14px 16px;
   margin: 10px 0;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(20, 60, 110, 0.08);
 }
 
 .card h2 {
@@ -97,6 +100,12 @@ h1 {
 
 /* --- Card umidita' / percepita --- */
 
+.card-icon {
+  text-align: center;
+  font-size: 1.8em;
+  margin-bottom: 6px;
+}
+
 .dual-metric {
   display: flex;
   justify-content: space-around;
@@ -110,8 +119,8 @@ h1 {
 
 .dual-label {
   font-weight: bold;
-  font-size: 0.9em;
-  color: #333;
+  font-size: 1.05em;
+  color: #222;
 }
 
 .dual-value {
