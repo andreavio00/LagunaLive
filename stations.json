@@ -39,14 +39,6 @@
       "role": "urban",
       "url": "",
       "measures": ["temperature", "humidity"]
-    },
-    {
-      "id": "cnr",
-      "name": "Piattaforma CNR",
-      "type": "cpsm",
-      "role": "marine_reference",
-      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Piattaforma_CNR.html",
-      "measures": ["temperature", "humidity", "water_temperature"]
     }
   ]
 }

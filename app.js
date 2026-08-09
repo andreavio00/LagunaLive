@@ -54,31 +54,22 @@ const MISERICORDIA_LABELS = [
   "Marea (m)"
 ];
 
-const CNR_LABELS = [
-  "Data/Ora",
-  "Temperatura (°C)",
-  "Umidità (%)",
-  "Temperatura acqua (°C)"
-];
-
 const STATION_LABELS = {
   punta_salute: PUNTA_SALUTE_LABELS,
   misericordia: MISERICORDIA_LABELS,
   palazzo_cavalli: PALAZZO_CAVALLI_LABELS,
-  san_giorgio: SAN_GIORGIO_LABELS,
-  cnr: CNR_LABELS
+  san_giorgio: SAN_GIORGIO_LABELS
 };
 
 // Colonne verificate direttamente su uno screenshot della scheda reale.
-// Per le stazioni non verificate (Misericordia, CNR) nascondiamo le
+// Per le stazioni non verificate (Misericordia) nascondiamo le
 // colonne extra invece di etichettarle genericamente "Colonna N", che
 // non da' nessuna informazione utile.
 const STATION_LABELS_VERIFIED = {
   punta_salute: true,
   misericordia: false,
   palazzo_cavalli: true,
-  san_giorgio: true,
-  cnr: false
+  san_giorgio: true
 };
 
 function formatTime(timestamp) {
@@ -309,13 +300,15 @@ async function loadCavanis() {
   const lastHumidity = lastOfType("UMID2M");
   const lastRadiation = lastOfType("RADSOL");
   const lastWindSpeed = lastOfType("VVENTO10M");
+  const lastWindDir = lastOfType("DVENTO10M");
 
   return {
     timestamp: lastTemp.dataora,
     temperature: parseFloat(lastTemp.valore),
     humidity: parseFloat(lastHumidity.valore),
     radiation: lastRadiation ? parseFloat(lastRadiation.valore) : null,
-    windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null
+    windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
+    windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null
   };
 }
 
@@ -582,10 +575,12 @@ async function loadAll() {
     // --- Card 4: vento, pioggia, pressione ---
 
     document.getElementById("wind").innerHTML =
-      windDirection(sanGiorgio.windDir) +
-      " " +
-      Math.round(sanGiorgio.windSpeed * 3.6) +
-      " km/h";
+      (cavanis.windDir != null && !isNaN(cavanis.windDir)
+        ? windDirection(cavanis.windDir) + " "
+        : "") +
+      (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed)
+        ? Math.round(cavanis.windSpeed * 3.6) + " km/h"
+        : "n.d.");
 
     document.getElementById("rain").innerHTML =
       cavalli.rain != null && !isNaN(cavalli.rain)
@@ -612,3 +607,14 @@ async function loadAll() {
 setupInteractions();
 loadStationsConfig();
 loadAll();
+
+// Registra il service worker per rendere la pagina installabile come
+// app (PWA): l'icona in home, l'apertura a schermo intero e l'avvio
+// piu' rapido funzionano solo se questo va a buon fine.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("sw.js")
+      .catch((err) => console.warn("Service worker non registrato:", err));
+  });
+}
