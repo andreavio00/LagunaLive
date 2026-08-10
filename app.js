@@ -315,6 +315,7 @@ async function loadCavanis() {
   const lastRadiation = lastOfType("RADSOL");
   const lastWindSpeed = lastOfType("VVENTO10M");
   const lastWindDir = lastOfType("DVENTO10M");
+  const lastRain = lastOfType("PREC");
 
   // RADSOL e' in MJ/mq (energia cumulata nell'ultima ora), non in
   // W/mq (potenza istantanea) come serve alla formula della
@@ -335,7 +336,9 @@ async function loadCavanis() {
     radiationTimestamp: lastRadiation ? lastRadiation.dataora : null,
     windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
     windSpeedTimestamp: lastWindSpeed ? lastWindSpeed.dataora : null,
-    windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null
+    windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null,
+    // PREC e' gia' in mm, nessuna conversione necessaria.
+    rain: lastRain ? parseFloat(lastRain.valore) : null
   };
 }
 
@@ -620,8 +623,8 @@ async function loadAll() {
         : "n.d.");
 
     document.getElementById("rain").innerHTML =
-      cavalli.rain != null && !isNaN(cavalli.rain)
-        ? cavalli.rain.toFixed(1) + " mm"
+      cavanis.rain != null && !isNaN(cavanis.rain)
+        ? cavanis.rain.toFixed(1) + " mm"
         : "n.d.";
 
     document.getElementById("pressure").innerHTML =
@@ -630,7 +633,11 @@ async function loadAll() {
     document.getElementById("airTime").innerHTML =
       formatTime(cavalli.timestamp);
 
-    document.getElementById("status").innerHTML = "";
+    const now = new Date();
+
+    document.getElementById("status").innerHTML =
+      "Aggiornato alle " +
+      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
   } catch (error) {
 
