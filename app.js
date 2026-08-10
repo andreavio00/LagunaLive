@@ -118,6 +118,17 @@ function windDirection(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
+// Minuti trascorsi tra due timestamp delle tabelle (stesso formato
+// "solare" di formatTime/formatDateTime, il fuso non conta per una
+// differenza).
+function minutesBetween(t1, t2) {
+
+  const d1 = new Date(t1.replace(" ", "T") + "+01:00");
+  const d2 = new Date(t2.replace(" ", "T") + "+01:00");
+
+  return Math.abs(d1 - d2) / 60000;
+}
+
 // Indice di calore (heat index), formula di Rothfusz (NWS).
 // Sotto i 27°C circa l'effetto e' trascurabile, quindi restituiamo
 // semplicemente la temperatura reale.
@@ -310,7 +321,9 @@ async function loadCavanis() {
     temperature: parseFloat(lastTemp.valore),
     humidity: parseFloat(lastHumidity.valore),
     radiation: lastRadiation ? parseFloat(lastRadiation.valore) : null,
+    radiationTimestamp: lastRadiation ? lastRadiation.dataora : null,
     windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
+    windSpeedTimestamp: lastWindSpeed ? lastWindSpeed.dataora : null,
     windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null
   };
 }
@@ -544,11 +557,21 @@ async function loadAll() {
     document.getElementById("heatIndex").innerHTML =
       hi.toFixed(1) + " °C";
 
+    const RADIATION_STALE_MINUTES = 30;
+
+    const radiationFresh =
+      cavanis.radiationTimestamp != null &&
+      minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= RADIATION_STALE_MINUTES;
+
+    const windFresh =
+      cavanis.windSpeedTimestamp != null &&
+      minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= RADIATION_STALE_MINUTES;
+
     const thsw = apparentTemperatureSun(
       cavanis.temperature,
       cavanis.humidity,
-      cavanis.windSpeed,
-      cavanis.radiation
+      windFresh ? cavanis.windSpeed : null,
+      radiationFresh ? cavanis.radiation : null
     );
 
     document.getElementById("thsw").innerHTML =
@@ -560,7 +583,7 @@ async function loadAll() {
     document.getElementById("humidityDetails").innerHTML = `
 <div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
 <div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
-<div class="sub-station" style="opacity:0.55; font-size:0.75em;">Diagnostica temporanea — radiazione: ${cavanis.radiation != null ? cavanis.radiation : "n.d."} W/mq &middot; vento: ${cavanis.windSpeed != null ? cavanis.windSpeed : "n.d."} m/s</div>
+<div class="sub-station" style="opacity:0.55; font-size:0.75em;">Diagnostica temporanea — radiazione: ${cavanis.radiation != null ? cavanis.radiation : "n.d."} W/mq, ore ${cavanis.radiationTimestamp ? formatTime(cavanis.radiationTimestamp) : "n.d."} (${radiationFresh ? "usata" : "scartata, troppo vecchia"}) &middot; vento: ${cavanis.windSpeed != null ? cavanis.windSpeed : "n.d."} m/s, ore ${cavanis.windSpeedTimestamp ? formatTime(cavanis.windSpeedTimestamp) : "n.d."} (${windFresh ? "usato" : "scartato, troppo vecchio"})</div>
 `;
 
     // --- Card 3: mare ---
