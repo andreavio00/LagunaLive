@@ -316,11 +316,22 @@ async function loadCavanis() {
   const lastWindSpeed = lastOfType("VVENTO10M");
   const lastWindDir = lastOfType("DVENTO10M");
 
+  // RADSOL e' in MJ/mq (energia cumulata nell'ultima ora), non in
+  // W/mq (potenza istantanea) come serve alla formula della
+  // temperatura percepita al sole. Si converte moltiplicando per
+  // 1.000.000 (MJ -> J) e dividendo per 3600 secondi (un'ora).
+  const MJ_TO_WATT_PER_SQM = 1000000 / 3600;
+
+  const radiationWm2 =
+    lastRadiation != null
+      ? parseFloat(lastRadiation.valore) * MJ_TO_WATT_PER_SQM
+      : null;
+
   return {
     timestamp: lastTemp.dataora,
     temperature: parseFloat(lastTemp.valore),
     humidity: parseFloat(lastHumidity.valore),
-    radiation: lastRadiation ? parseFloat(lastRadiation.valore) : null,
+    radiation: radiationWm2,
     radiationTimestamp: lastRadiation ? lastRadiation.dataora : null,
     windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
     windSpeedTimestamp: lastWindSpeed ? lastWindSpeed.dataora : null,
@@ -557,15 +568,15 @@ async function loadAll() {
     document.getElementById("heatIndex").innerHTML =
       hi.toFixed(1) + " °C";
 
-    const RADIATION_STALE_MINUTES = 30;
-
-    const radiationFresh =
-      cavanis.radiationTimestamp != null &&
-      minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= RADIATION_STALE_MINUTES;
+    const STALE_MINUTES = 30;
 
     const windFresh =
       cavanis.windSpeedTimestamp != null &&
-      minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= RADIATION_STALE_MINUTES;
+      minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
+
+    const radiationFresh =
+      cavanis.radiationTimestamp != null &&
+      minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= STALE_MINUTES;
 
     const thsw = apparentTemperatureSun(
       cavanis.temperature,
@@ -583,7 +594,7 @@ async function loadAll() {
     document.getElementById("humidityDetails").innerHTML = `
 <div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
 <div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
-<div class="sub-station" style="opacity:0.55; font-size:0.75em;">Diagnostica temporanea — radiazione: ${cavanis.radiation != null ? cavanis.radiation : "n.d."} W/mq, ore ${cavanis.radiationTimestamp ? formatTime(cavanis.radiationTimestamp) : "n.d."} (${radiationFresh ? "usata" : "scartata, troppo vecchia"}) &middot; vento: ${cavanis.windSpeed != null ? cavanis.windSpeed : "n.d."} m/s, ore ${cavanis.windSpeedTimestamp ? formatTime(cavanis.windSpeedTimestamp) : "n.d."} (${windFresh ? "usato" : "scartato, troppo vecchio"})</div>
+<div class="sub-station" style="opacity:0.55; font-size:0.75em;">Diagnostica temporanea — radiazione (Cavanis, convertita da MJ/mq): ${cavanis.radiation != null ? cavanis.radiation.toFixed(0) : "n.d."} W/mq, ore ${cavanis.radiationTimestamp ? formatTime(cavanis.radiationTimestamp) : "n.d."} (${radiationFresh ? "usata" : "scartata, troppo vecchia"}) &middot; vento: ${cavanis.windSpeed != null ? cavanis.windSpeed : "n.d."} m/s, ore ${cavanis.windSpeedTimestamp ? formatTime(cavanis.windSpeedTimestamp) : "n.d."} (${windFresh ? "usato" : "scartato, troppo vecchio"})</div>
 `;
 
     // --- Card 3: mare ---
