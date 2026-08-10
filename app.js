@@ -594,7 +594,6 @@ async function loadAll() {
     document.getElementById("humidityDetails").innerHTML = `
 <div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
 <div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
-<div class="sub-station" style="opacity:0.55; font-size:0.75em;">Diagnostica temporanea — radiazione (Cavanis, convertita da MJ/mq): ${cavanis.radiation != null ? cavanis.radiation.toFixed(0) : "n.d."} W/mq, ore ${cavanis.radiationTimestamp ? formatTime(cavanis.radiationTimestamp) : "n.d."} (${radiationFresh ? "usata" : "scartata, troppo vecchia"}) &middot; vento: ${cavanis.windSpeed != null ? cavanis.windSpeed : "n.d."} m/s, ore ${cavanis.windSpeedTimestamp ? formatTime(cavanis.windSpeedTimestamp) : "n.d."} (${windFresh ? "usato" : "scartato, troppo vecchio"})</div>
 `;
 
     // --- Card 3: mare ---
