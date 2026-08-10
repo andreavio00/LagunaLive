@@ -560,6 +560,7 @@ async function loadAll() {
     document.getElementById("humidityDetails").innerHTML = `
 <div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})</div>
 <div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)})</div>
+<div class="sub-station" style="opacity:0.55; font-size:0.75em;">Diagnostica temporanea — radiazione: ${cavanis.radiation != null ? cavanis.radiation : "n.d."} W/mq &middot; vento: ${cavanis.windSpeed != null ? cavanis.windSpeed : "n.d."} m/s</div>
 `;
 
     // --- Card 3: mare ---
