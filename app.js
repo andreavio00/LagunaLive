@@ -144,43 +144,46 @@ function heatIndex(tempC, humidity) {
   return (HI - 32) * 5 / 9; // torna in Celsius
 }
 
-function vaporPressure(tempC, humidity) {
-  return (humidity / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
-}
-
 // Temperatura percepita "al sole". Il THSW di Davis Instruments e'
 // una formula proprietaria che il produttore non ha mai reso
-// pubblica, quindi non e' riproducibile esattamente. Usiamo qui
-// l'Apparent Temperature di Steadman (1994), la formula pubblica
-// adottata dal Bureau of Meteorology australiano, che e'
-// l'equivalente aperto piu' vicino: include anch'essa temperatura,
-// umidita', vento e radiazione solare.
+// pubblica, quindi non e' riproducibile esattamente.
 //
-// Il termine solare va limitato a un intervallo fisico ragionevole:
-// usare la radiazione misurata (centinaia di W/mq) cosi' com'e' fa
-// esplodere il risultato quando il vento e' vicino a zero, perche' il
-// termine e' diviso per (vento + 10). Lo stesso Davis, per il termine
-// "sole" del suo indice, documenta un limite tra -20 e +130 W/mq:
-// usiamo lo stesso limite qui.
+// Versione precedente (sbagliata): calcolava "al sole" con la formula
+// dell'Apparent Temperature di Steadman per intero, come valore
+// assoluto indipendente. Il problema e' che quella formula e l'indice
+// di calore "all'ombra" (Rothfusz) sono due formule diverse, con basi
+// di calcolo diverse: potevano quindi benissimo dare "al sole" piu'
+// basso di "all'ombra" anche in pieno giorno, senza che ci fosse
+// nessuna vera incoerenza fisica nei dati - solo due formule scollegate.
+//
+// Versione corretta: "al sole" parte sempre dal valore "all'ombra" e
+// ci aggiunge solo l'effetto aggiuntivo del sole (mai negativo). Cosi'
+// "al sole" e' garantito essere sempre >= "all'ombra", e i due
+// coincidono quando non c'e' radiazione solare (es. di notte), come
+// ci si aspetta.
+//
+// L'effetto aggiuntivo del sole e' preso dal termine solare della
+// stessa Apparent Temperature di Steadman (1994) usata dal Bureau of
+// Meteorology australiano: 0.70 * radiazione / (vento + 10). La
+// radiazione va limitata a un intervallo fisico ragionevole, altrimenti
+// con vento vicino a zero il termine esplode: usiamo lo stesso limite
+// che Davis documenta per il termine "sole" del proprio indice (fino a
+// +130 W/mq).
 function apparentTemperatureSun(tempC, humidity, windSpeedMs, solarRadiation) {
+
+  const hi = heatIndex(tempC, humidity);
 
   if (
     solarRadiation == null || isNaN(solarRadiation) ||
     windSpeedMs == null || isNaN(windSpeedMs)
   ) {
-    return heatIndex(tempC, humidity);
+    return hi;
   }
 
-  const e = vaporPressure(tempC, humidity);
-  const Q = Math.max(-20, Math.min(130, solarRadiation));
+  const Q = Math.max(0, Math.min(130, solarRadiation));
+  const solarBoost = 0.70 * (Q / (windSpeedMs + 10));
 
-  return (
-    tempC +
-    0.348 * e -
-    0.70 * windSpeedMs +
-    0.70 * (Q / (windSpeedMs + 10)) -
-    4.25
-  );
+  return hi + solarBoost;
 }
 
 // Le tabelle delle stazioni CPSM non hanno una riga di intestazione
