@@ -645,21 +645,38 @@ async function loadAll() {
 
     const STALE_MINUTES = 30;
 
-    const radiationFresh =
-      cavanis.radiationTimestamp != null &&
-      minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= STALE_MINUTES;
+    // Il calcolo "al sole" e' isolato in un try/catch dedicato: se per
+    // qualsiasi motivo imprevisto va in errore (es. un caso limite nei
+    // dati non ancora visto), "al sole" torna semplicemente uguale ad
+    // "all'ombra" invece di bloccare il caricamento di tutto il resto
+    // della pagina (mare, vento, pioggia, pressione).
+    let thsw = hi;
 
-    const windFresh =
-      cavanis.windSpeedTimestamp != null &&
-      minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
+    try {
 
-    const thsw = apparentTemperatureSun(
-      cavanis.temperature,
-      cavanis.humidity,
-      windFresh ? cavanis.windSpeed : null,
-      radiationFresh ? cavanis.radiation : null,
-      radiationFresh ? cavanis.radiationTimestamp : null
-    );
+      const radiationFresh =
+        cavanis.radiationTimestamp != null &&
+        minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= STALE_MINUTES;
+
+      const windFresh =
+        cavanis.windSpeedTimestamp != null &&
+        minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
+
+      thsw = apparentTemperatureSun(
+        cavanis.temperature,
+        cavanis.humidity,
+        windFresh ? cavanis.windSpeed : null,
+        radiationFresh ? cavanis.radiation : null,
+        radiationFresh ? cavanis.radiationTimestamp : null
+      );
+
+      if (thsw == null || isNaN(thsw)) {
+        thsw = hi;
+      }
+
+    } catch (thswError) {
+      console.error("Errore nel calcolo dell'indice al sole, uso il valore all'ombra:", thswError);
+    }
 
     document.getElementById("thsw").innerHTML =
       thsw.toFixed(1) + " °C";
