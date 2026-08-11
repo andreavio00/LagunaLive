@@ -155,46 +155,118 @@ function heatIndex(tempC, humidity) {
   return (HI - 32) * 5 / 9; // torna in Celsius
 }
 
+const VENICE_LAT = 45.4408;
+const VENICE_LON = 12.3155;
+const ITALY_STANDARD_MERIDIAN = 15; // riferimento del fuso UTC+1
+
+function degToRad(d) {
+  return d * Math.PI / 180;
+}
+
+// Seno dell'altezza del sole sull'orizzonte a Venezia, dato un timestamp
+// in ora solare UTC+1 (lo stesso formato "grezzo" restituito dall'API
+// ARPA, prima della conversione a ora legale usata per la visualizzazione).
+// Negativo quando il sole e' sotto l'orizzonte (notte).
+function solarElevationSin(timestamp) {
+
+  const [datePart, timePart] = timestamp.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hh, mm, ss] = timePart.split(":").map(Number);
+
+  const clockHours = hh + mm / 60 + (ss || 0) / 3600;
+
+  const startOfYear = Date.UTC(year, 0, 1);
+  const current = Date.UTC(year, month - 1, day);
+  const dayOfYear = Math.round((current - startOfYear) / 86400000) + 1;
+
+  // Declinazione solare (formula di Cooper)
+  const decl = degToRad(23.45 * Math.sin(degToRad(360 / 365 * (284 + dayOfYear))));
+
+  // Equazione del tempo, in minuti
+  const B = degToRad(360 / 365 * (dayOfYear - 81));
+  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+
+  // Correzione da ora del fuso a ora solare vera, in minuti (longitudine +
+  // equazione del tempo)
+  const timeCorrectionMinutes = 4 * (VENICE_LON - ITALY_STANDARD_MERIDIAN) + eot;
+
+  const solarTimeHours = clockHours + timeCorrectionMinutes / 60;
+  const hourAngle = degToRad(15 * (solarTimeHours - 12));
+
+  const lat = degToRad(VENICE_LAT);
+
+  return Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(hourAngle);
+}
+
+function vaporPressure(tempC, humidity) {
+  return (humidity / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
+}
+
 // Temperatura percepita "al sole". Il THSW di Davis Instruments e'
 // una formula proprietaria che il produttore non ha mai reso
 // pubblica, quindi non e' riproducibile esattamente.
 //
-// Versione precedente (sbagliata): calcolava "al sole" con la formula
-// dell'Apparent Temperature di Steadman per intero, come valore
-// assoluto indipendente. Il problema e' che quella formula e l'indice
-// di calore "all'ombra" (Rothfusz) sono due formule diverse, con basi
-// di calcolo diverse: potevano quindi benissimo dare "al sole" piu'
-// basso di "all'ombra" anche in pieno giorno, senza che ci fosse
-// nessuna vera incoerenza fisica nei dati - solo due formule scollegate.
+// Storia delle versioni precedenti:
+// 1) Termine solare 0.70 * radiazione / (vento + 10): sovrastimava
+//    mattina/sera presto perche' non teneva conto dell'angolo del sole
+//    (confermato dalla documentazione del Bureau of Meteorology
+//    australiano stesso).
+// 2) Bonus solare 0.007 * radiazione * sin(h) sommato all'indice di
+//    calore "all'ombra": risolveva il problema dell'angolo ma ignorava
+//    il vento, che invece pesa - verificato con un caso reale (11
+//    agosto, 09:34, 31.6°C, 53% UR, 480 W/mq, vento 0.44 m/s) dove il
+//    valore atteso "al sole" (37.8°C) tornava solo includendo il vento
+//    come termine indipendente, non legato alla radiazione.
 //
-// Versione corretta: "al sole" parte sempre dal valore "all'ombra" e
-// ci aggiunge solo l'effetto aggiuntivo del sole (mai negativo). Cosi'
-// "al sole" e' garantito essere sempre >= "all'ombra", e i due
-// coincidono quando non c'e' radiazione solare (es. di notte), come
-// ci si aspetta.
+// Versione attuale: la formula completa dell'Apparent Temperature di
+// Steadman con radiazione, come riportata su Wikipedia/BOM:
+//   AT = T + 0.33*e - 0.70*V + 0.007*R*sin(h) - 4.00
+// dove V e' il vento (m/s) ed e' la pressione di vapore (hPa). Con il
+// caso di verifica sopra questa formula da' 37.75°C, praticamente
+// identico al valore atteso di 37.8°C.
 //
-// L'effetto aggiuntivo del sole e' preso dal termine solare della
-// stessa Apparent Temperature di Steadman (1994) usata dal Bureau of
-// Meteorology australiano: 0.70 * radiazione / (vento + 10). La
-// radiazione va limitata a un intervallo fisico ragionevole, altrimenti
-// con vento vicino a zero il termine esplode: usiamo lo stesso limite
-// che Davis documenta per il termine "sole" del proprio indice (fino a
-// +130 W/mq).
-function apparentTemperatureSun(tempC, humidity, windSpeedMs, solarRadiation) {
+// Essendo pero' una formula assoluta indipendente dall'indice di
+// calore "all'ombra" (Rothfusz, usato altrove in questa card), nei
+// casi limite le due formule potrebbero teoricamente scollegarsi come
+// successo in passato: per sicurezza "al sole" non scende mai sotto
+// "all'ombra", prendendo il maggiore dei due.
+function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radiationTimestamp) {
 
   const hi = heatIndex(tempC, humidity);
 
   if (
-    solarRadiation == null || isNaN(solarRadiation) ||
-    windSpeedMs == null || isNaN(windSpeedMs)
+    radiationWm2 == null || isNaN(radiationWm2) ||
+    windSpeedMs == null || isNaN(windSpeedMs) ||
+    !radiationTimestamp
   ) {
     return hi;
   }
 
-  const Q = Math.max(0, Math.min(130, solarRadiation));
-  const solarBoost = 0.70 * (Q / (windSpeedMs + 10));
+  // Limite di sicurezza contro letture anomale del sensore: la
+  // radiazione solare reale a livello del mare non supera mai
+  // valori dell'ordine di 1100 W/mq.
+  const R = Math.max(0, Math.min(1100, radiationWm2));
+  const sinH = Math.max(0, solarElevationSin(radiationTimestamp));
 
-  return hi + solarBoost;
+  // Senza un vero contributo del sole (di notte, o radiazione nulla)
+  // "al sole" deve coincidere esattamente con "all'ombra": altrimenti,
+  // usando comunque la formula di Steadman, la differenza tra le due
+  // basi di calcolo (Rothfusz vs Steadman) creerebbe un falso bonus
+  // anche senza sole, cosa priva di senso fisico.
+  if (R <= 0 || sinH <= 0) {
+    return hi;
+  }
+
+  const e = vaporPressure(tempC, humidity);
+
+  const at =
+    tempC +
+    0.33 * e -
+    0.70 * windSpeedMs +
+    0.007 * R * sinH -
+    4.00;
+
+  return Math.max(hi, at);
 }
 
 // Le tabelle delle stazioni CPSM non hanno una riga di intestazione
@@ -573,19 +645,20 @@ async function loadAll() {
 
     const STALE_MINUTES = 30;
 
-    const windFresh =
-      cavanis.windSpeedTimestamp != null &&
-      minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
-
     const radiationFresh =
       cavanis.radiationTimestamp != null &&
       minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= STALE_MINUTES;
+
+    const windFresh =
+      cavanis.windSpeedTimestamp != null &&
+      minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
     const thsw = apparentTemperatureSun(
       cavanis.temperature,
       cavanis.humidity,
       windFresh ? cavanis.windSpeed : null,
-      radiationFresh ? cavanis.radiation : null
+      radiationFresh ? cavanis.radiation : null,
+      radiationFresh ? cavanis.radiationTimestamp : null
     );
 
     document.getElementById("thsw").innerHTML =
