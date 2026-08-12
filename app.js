@@ -655,9 +655,10 @@ async function loadAll() {
         cavanis.windSpeedTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
-      // cavanis.windSpeed arriva dall'API ARPA in km/h: la formula
-      // "al sole" vuole il vento in m/s, va quindi convertito qui
-      // (/ 3.6) prima di passarlo alla funzione.
+      const sinHDebug = cavanis.radiationTimestamp
+        ? solarElevationSin(cavanis.radiationTimestamp)
+        : null;
+
       thsw = apparentTemperatureSun(
         cavanis.temperature,
         cavanis.humidity,
@@ -666,12 +667,29 @@ async function loadAll() {
         radiationFresh ? cavanis.radiationTimestamp : null
       );
 
+      // DEBUG TEMPORANEO: scrive i valori intermedi in un riquadro
+      // visibile a schermo (utile da telefono, senza devtools).
+      // Rimuovere questo blocco una volta risolto il problema.
+      const debugBox = document.getElementById("debugThsw");
+      if (debugBox) {
+        debugBox.textContent =
+          "timestamp temp: " + cavanis.timestamp + "\n" +
+          "radiation: " + cavanis.radiation + " W/mq   ts: " + cavanis.radiationTimestamp + "   fresh: " + radiationFresh + "\n" +
+          "wind (km/h grezzo API): " + cavanis.windSpeed + "   ts: " + cavanis.windSpeedTimestamp + "   fresh: " + windFresh + "\n" +
+          "sinH (altezza sole): " + sinHDebug + "\n" +
+          "HI: " + hi.toFixed(2) + "   THSW risultante: " + thsw;
+      }
+
       if (thsw == null || isNaN(thsw)) {
         thsw = hi;
       }
 
     } catch (thswError) {
       console.error("Errore nel calcolo dell'indice al sole, uso il valore all'ombra:", thswError);
+      const debugBox = document.getElementById("debugThsw");
+      if (debugBox) {
+        debugBox.textContent = "ERRORE nel calcolo: " + thswError.message;
+      }
     }
 
     document.getElementById("thsw").innerHTML =
