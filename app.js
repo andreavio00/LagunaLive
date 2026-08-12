@@ -645,6 +645,23 @@ async function loadAll() {
     // della pagina (mare, vento, pioggia, pressione).
     let thsw = hi;
 
+    // DEBUG TEMPORANEO: riquadro visibile a schermo, aggiornato passo
+    // passo (cosi' anche se un pezzo del calcolo fallisce vediamo
+    // comunque i valori raccolti fino a quel punto). Da rimuovere una
+    // volta risolto il problema.
+    const debugBox = document.getElementById("debugThsw");
+    const debugLines = [];
+    const updateDebug = () => {
+      if (debugBox) debugBox.textContent = debugLines.join("\n");
+    };
+
+    debugLines.push("cavanis.radiation = " + JSON.stringify(cavanis.radiation));
+    debugLines.push("cavanis.radiationTimestamp = " + JSON.stringify(cavanis.radiationTimestamp) + "  (tipo: " + typeof cavanis.radiationTimestamp + ")");
+    debugLines.push("cavanis.windSpeed (km/h) = " + JSON.stringify(cavanis.windSpeed));
+    debugLines.push("cavanis.windSpeedTimestamp = " + JSON.stringify(cavanis.windSpeedTimestamp));
+    debugLines.push("cavanis.timestamp (riferimento) = " + JSON.stringify(cavanis.timestamp));
+    updateDebug();
+
     try {
 
       const radiationFresh =
@@ -655,9 +672,19 @@ async function loadAll() {
         cavanis.windSpeedTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
-      const sinHDebug = cavanis.radiationTimestamp
-        ? solarElevationSin(cavanis.radiationTimestamp)
-        : null;
+      debugLines.push("radiationFresh = " + radiationFresh + "   windFresh = " + windFresh);
+      updateDebug();
+
+      let sinHDebug = null;
+      try {
+        sinHDebug = cavanis.radiationTimestamp
+          ? solarElevationSin(cavanis.radiationTimestamp)
+          : null;
+        debugLines.push("sinH (altezza sole) = " + sinHDebug);
+      } catch (sinErr) {
+        debugLines.push("ERRORE nel calcolo di sinH: " + sinErr.message);
+      }
+      updateDebug();
 
       thsw = apparentTemperatureSun(
         cavanis.temperature,
@@ -667,18 +694,8 @@ async function loadAll() {
         radiationFresh ? cavanis.radiationTimestamp : null
       );
 
-      // DEBUG TEMPORANEO: scrive i valori intermedi in un riquadro
-      // visibile a schermo (utile da telefono, senza devtools).
-      // Rimuovere questo blocco una volta risolto il problema.
-      const debugBox = document.getElementById("debugThsw");
-      if (debugBox) {
-        debugBox.textContent =
-          "timestamp temp: " + cavanis.timestamp + "\n" +
-          "radiation: " + cavanis.radiation + " W/mq   ts: " + cavanis.radiationTimestamp + "   fresh: " + radiationFresh + "\n" +
-          "wind (km/h grezzo API): " + cavanis.windSpeed + "   ts: " + cavanis.windSpeedTimestamp + "   fresh: " + windFresh + "\n" +
-          "sinH (altezza sole): " + sinHDebug + "\n" +
-          "HI: " + hi.toFixed(2) + "   THSW risultante: " + thsw;
-      }
+      debugLines.push("HI = " + hi.toFixed(2) + "   THSW risultante = " + thsw);
+      updateDebug();
 
       if (thsw == null || isNaN(thsw)) {
         thsw = hi;
@@ -686,10 +703,8 @@ async function loadAll() {
 
     } catch (thswError) {
       console.error("Errore nel calcolo dell'indice al sole, uso il valore all'ombra:", thswError);
-      const debugBox = document.getElementById("debugThsw");
-      if (debugBox) {
-        debugBox.textContent = "ERRORE nel calcolo: " + thswError.message;
-      }
+      debugLines.push("ERRORE nel calcolo: " + thswError.message);
+      updateDebug();
     }
 
     document.getElementById("thsw").innerHTML =
