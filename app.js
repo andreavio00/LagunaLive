@@ -169,7 +169,13 @@ function degToRad(d) {
 // Negativo quando il sole e' sotto l'orizzonte (notte).
 function solarElevationSin(timestamp) {
 
-  const [datePart, timePart] = timestamp.split(" ");
+  // Il timestamp puo' arrivare sia come "YYYY-MM-DD HH:MM:SS" (spazio,
+  // formato usato altrove in questo file) sia come "YYYY-MM-DDTHH:MM:SS"
+  // (ISO con "T", formato effettivamente restituito per il campo
+  // dataora della radiazione dall'API ARPA): normalizziamo prima di
+  // separare data e ora, altrimenti con la "T" non c'e' nessuno spazio
+  // da trovare e timePart risulta undefined.
+  const [datePart, timePart] = timestamp.replace("T", " ").split(" ");
   const [year, month, day] = datePart.split("-").map(Number);
   const [hh, mm, ss] = timePart.split(":").map(Number);
 
@@ -645,23 +651,6 @@ async function loadAll() {
     // della pagina (mare, vento, pioggia, pressione).
     let thsw = hi;
 
-    // DEBUG TEMPORANEO: riquadro visibile a schermo, aggiornato passo
-    // passo (cosi' anche se un pezzo del calcolo fallisce vediamo
-    // comunque i valori raccolti fino a quel punto). Da rimuovere una
-    // volta risolto il problema.
-    const debugBox = document.getElementById("debugThsw");
-    const debugLines = [];
-    const updateDebug = () => {
-      if (debugBox) debugBox.textContent = debugLines.join("\n");
-    };
-
-    debugLines.push("cavanis.radiation = " + JSON.stringify(cavanis.radiation));
-    debugLines.push("cavanis.radiationTimestamp = " + JSON.stringify(cavanis.radiationTimestamp) + "  (tipo: " + typeof cavanis.radiationTimestamp + ")");
-    debugLines.push("cavanis.windSpeed (km/h) = " + JSON.stringify(cavanis.windSpeed));
-    debugLines.push("cavanis.windSpeedTimestamp = " + JSON.stringify(cavanis.windSpeedTimestamp));
-    debugLines.push("cavanis.timestamp (riferimento) = " + JSON.stringify(cavanis.timestamp));
-    updateDebug();
-
     try {
 
       const radiationFresh =
@@ -672,20 +661,6 @@ async function loadAll() {
         cavanis.windSpeedTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
-      debugLines.push("radiationFresh = " + radiationFresh + "   windFresh = " + windFresh);
-      updateDebug();
-
-      let sinHDebug = null;
-      try {
-        sinHDebug = cavanis.radiationTimestamp
-          ? solarElevationSin(cavanis.radiationTimestamp)
-          : null;
-        debugLines.push("sinH (altezza sole) = " + sinHDebug);
-      } catch (sinErr) {
-        debugLines.push("ERRORE nel calcolo di sinH: " + sinErr.message);
-      }
-      updateDebug();
-
       thsw = apparentTemperatureSun(
         cavanis.temperature,
         cavanis.humidity,
@@ -694,17 +669,12 @@ async function loadAll() {
         radiationFresh ? cavanis.radiationTimestamp : null
       );
 
-      debugLines.push("HI = " + hi.toFixed(2) + "   THSW risultante = " + thsw);
-      updateDebug();
-
       if (thsw == null || isNaN(thsw)) {
         thsw = hi;
       }
 
     } catch (thswError) {
       console.error("Errore nel calcolo dell'indice al sole, uso il valore all'ombra:", thswError);
-      debugLines.push("ERRORE nel calcolo: " + thswError.message);
-      updateDebug();
     }
 
     document.getElementById("thsw").innerHTML =
