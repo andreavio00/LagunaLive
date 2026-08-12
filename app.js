@@ -204,32 +204,29 @@ function vaporPressure(tempC, humidity) {
 
 // Temperatura percepita "al sole". Il THSW di Davis Instruments e'
 // una formula proprietaria che il produttore non ha mai reso
-// pubblica, quindi non e' riproducibile esattamente.
+// pubblica, quindi non e' riproducibile esattamente: questa e' una
+// stima trasparente in stile THSW, verificata a mano nel foglio
+// "Indice_calore_AT_TH_SW_Steadman_Cavanis.xlsx" (colonna "THSW
+// Davis").
 //
-// Storia delle versioni precedenti:
-// 1) Termine solare 0.70 * radiazione / (vento + 10): sovrastimava
-//    mattina/sera presto perche' non teneva conto dell'angolo del sole
-//    (confermato dalla documentazione del Bureau of Meteorology
-//    australiano stesso).
-// 2) Bonus solare 0.007 * radiazione * sin(h) sommato all'indice di
-//    calore "all'ombra": risolveva il problema dell'angolo ma ignorava
-//    il vento, che invece pesa - verificato con un caso reale (11
-//    agosto, 09:34, 31.6°C, 53% UR, 480 W/mq, vento 0.44 m/s) dove il
-//    valore atteso "al sole" (37.8°C) tornava solo includendo il vento
-//    come termine indipendente, non legato alla radiazione.
+// Si parte dall'indice di calore "all'ombra" (Rothfusz) e si somma un
+// bonus dovuto all'irraggiamento diretto, pesato dall'altezza del
+// sole sull'orizzonte (nullo se il sole e' basso o sotto
+// l'orizzonte), a cui si sottrae un termine di raffreddamento dovuto
+// al vento:
 //
-// Versione attuale: la formula completa dell'Apparent Temperature di
-// Steadman con radiazione, come riportata su Wikipedia/BOM:
-//   AT = T + 0.33*e - 0.70*V + 0.007*R*sin(h) - 4.00
-// dove V e' il vento (m/s) ed e' la pressione di vapore (hPa). Con il
-// caso di verifica sopra questa formula da' 37.75°C, praticamente
-// identico al valore atteso di 37.8°C.
+//   THSW = HI + max(0, 0.02 * R * sin(h)) - 0.70 * V
 //
-// Essendo pero' una formula assoluta indipendente dall'indice di
-// calore "all'ombra" (Rothfusz, usato altrove in questa card), nei
-// casi limite le due formule potrebbero teoricamente scollegarsi come
-// successo in passato: per sicurezza "al sole" non scende mai sotto
-// "all'ombra", prendendo il maggiore dei due.
+// dove R e' la radiazione solare globale (W/mq), h l'altezza del sole
+// e V il vento (m/s, NON km/h: l'API ARPA restituisce il vento in
+// km/h, va quindi convertito da chi chiama questa funzione).
+//
+// "Al sole" e' un valore assoluto indipendente dall'indice di calore
+// "all'ombra": in condizioni di vento forte e poco sole il termine
+// del vento potrebbe farlo scendere sotto l'indice di calore, cosa
+// priva di senso fisico (il sole non puo' mai far percepire *meno*
+// caldo dell'ombra). Per questo il risultato finale non scende mai
+// sotto l'indice di calore, prendendo il maggiore dei due.
 function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radiationTimestamp) {
 
   const hi = heatIndex(tempC, humidity);
@@ -249,24 +246,17 @@ function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radi
   const sinH = Math.max(0, solarElevationSin(radiationTimestamp));
 
   // Senza un vero contributo del sole (di notte, o radiazione nulla)
-  // "al sole" deve coincidere esattamente con "all'ombra": altrimenti,
-  // usando comunque la formula di Steadman, la differenza tra le due
-  // basi di calcolo (Rothfusz vs Steadman) creerebbe un falso bonus
-  // anche senza sole, cosa priva di senso fisico.
+  // "al sole" deve coincidere esattamente con "all'ombra".
   if (R <= 0 || sinH <= 0) {
     return hi;
   }
 
-  const e = vaporPressure(tempC, humidity);
+  const solarBonus = 0.02 * R * sinH;
+  const windPenalty = 0.70 * windSpeedMs;
 
-  const at =
-    tempC +
-    0.33 * e -
-    0.70 * windSpeedMs +
-    0.007 * R * sinH -
-    4.00;
+  const thsw = hi + solarBonus - windPenalty;
 
-  return Math.max(hi, at);
+  return Math.max(hi, thsw);
 }
 
 // Le tabelle delle stazioni CPSM non hanno una riga di intestazione
@@ -406,6 +396,9 @@ async function loadCavanis() {
     humidity: parseFloat(lastHumidity.valore),
     radiation: radiationWm2,
     radiationTimestamp: lastRadiation ? lastRadiation.dataora : null,
+    // VVENTO10M e' gia' in km/h nell'API ARPA: nessuna conversione
+    // qui, chi consuma questo valore per formule che vogliono m/s
+    // (es. apparentTemperatureSun) deve dividere per 3.6.
     windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
     windSpeedTimestamp: lastWindSpeed ? lastWindSpeed.dataora : null,
     windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null,
@@ -662,10 +655,13 @@ async function loadAll() {
         cavanis.windSpeedTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
+      // cavanis.windSpeed arriva dall'API ARPA in km/h: la formula
+      // "al sole" vuole il vento in m/s, va quindi convertito qui
+      // (/ 3.6) prima di passarlo alla funzione.
       thsw = apparentTemperatureSun(
         cavanis.temperature,
         cavanis.humidity,
-        windFresh ? cavanis.windSpeed : null,
+        windFresh ? cavanis.windSpeed / 3.6 : null,
         radiationFresh ? cavanis.radiation : null,
         radiationFresh ? cavanis.radiationTimestamp : null
       );
@@ -704,12 +700,14 @@ async function loadAll() {
 
     // --- Card 4: vento, pioggia, pressione ---
 
+    // cavanis.windSpeed e' gia' in km/h (unita' nativa dell'API ARPA):
+    // niente conversione qui, va solo arrotondato.
     document.getElementById("wind").innerHTML =
       (cavanis.windDir != null && !isNaN(cavanis.windDir)
         ? windDirection(cavanis.windDir) + " "
         : "") +
       (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed)
-        ? Math.round(cavanis.windSpeed * 3.6) + " km/h"
+        ? Math.round(cavanis.windSpeed) + " km/h"
         : "n.d.");
 
     document.getElementById("rain").innerHTML =
