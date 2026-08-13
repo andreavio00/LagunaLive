@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.14";
+const APP_VERSION = "v2.15";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -337,12 +337,22 @@ function parseLastRowLabeled(text, labels, showUnknown = true) {
       return;
     }
 
-    rows.push({
-      label: labels[i] || ("Colonna " + (i + 1)),
-      value: i === 0
-        ? (value !== "" ? formatDateTime(value) : "n.d.")
-        : (value !== "" ? value : "n.d.")
-    });
+    const label = labels[i] || ("Colonna " + (i + 1));
+
+    let displayValue;
+    if (i === 0) {
+      displayValue = value !== "" ? formatDateTime(value) : "n.d.";
+    } else if (label.startsWith("Direzione vento") && value !== "" && !isNaN(parseFloat(value))) {
+      // La direzione arriva in gradi (es. "45"): la mostriamo nel
+      // formato a punti cardinali piu' leggibile, tenendo comunque i
+      // gradi tra parentesi per chi vuole il dato preciso.
+      const deg = parseFloat(value);
+      displayValue = windDirection(deg) + " (" + Math.round(deg) + "°)";
+    } else {
+      displayValue = value !== "" ? value : "n.d.";
+    }
+
+    rows.push({ label, value: displayValue });
   });
 
   return rows;
