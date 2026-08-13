@@ -1,4 +1,4 @@
-const CACHE_NAME = "lagunalive-shell-v12";
+const CACHE_NAME = "lagunalive-shell-v13";
 
 // Solo la "cornice" dell'app (HTML/CSS/JS/icone) viene messa in cache:
 // i dati meteo restano sempre presi dalla rete in tempo reale, cosi'

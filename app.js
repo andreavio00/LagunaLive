@@ -1,3 +1,9 @@
+// Numero di versione mostrato accanto all'orario di aggiornamento in
+// fondo alla pagina. Da allineare manualmente al numero della cache
+// in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
+// i due numeri restano sempre coerenti tra loro.
+const APP_VERSION = "v13";
+
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
 
@@ -527,8 +533,12 @@ async function loadStationsConfig() {
 
     row.addEventListener("click", () => {
 
+      // Nota: la card principale in alto (temperatura) continua a
+      // linkare la pagina Meteonetwork tramite mainTempLink. Qui,
+      // nella lista delle stazioni, si mostra invece una scheda con
+      // i dati grezzi dell'API ARPA, come per le altre stazioni.
       if (station.type === "meteonetwork") {
-        window.open(CAVANIS_URL, "_blank");
+        openCavanisModal();
         return;
       }
 
@@ -583,6 +593,50 @@ async function openStationModal(title, url, labels, showUnknown = true) {
 
     console.error(err);
     showModal(title, "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>");
+  }
+}
+
+// Scheda dati ARPA per Osservatorio Cavanis, usata dalla lista
+// "Stazioni utilizzate" in fondo alla pagina. La card principale in
+// alto (temperatura) continua invece a linkare la pagina Meteonetwork
+// tramite mainTempLink/CAVANIS_URL: qui si tratta di una scheda
+// separata, coerente nello stile con le altre stazioni della lista
+// (Palazzo Cavalli, San Giorgio, Punta della Salute), ma con dati
+// presi dall'API ARPA invece che dalle pagine del Comune.
+async function openCavanisModal() {
+
+  showModal("Osservatorio Cavanis", "<p>Caricamento dati aggiornati...</p>");
+
+  try {
+
+    const cavanis = await loadCavanis();
+
+    const rows = [
+      { label: "Temperatura", value: cavanis.temperature != null ? cavanis.temperature.toFixed(1) + " °C" : "n.d." },
+      { label: "Umidità", value: cavanis.humidity != null ? cavanis.humidity.toFixed(0) + " %" : "n.d." },
+      {
+        label: "Vento",
+        value:
+          (cavanis.windDir != null && !isNaN(cavanis.windDir) ? windDirection(cavanis.windDir) + " " : "") +
+          (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed) ? Math.round(cavanis.windSpeed) + " km/h" : "n.d.")
+      },
+      { label: "Radiazione solare", value: cavanis.radiation != null ? Math.round(cavanis.radiation) + " W/mq" : "n.d." },
+      { label: "Pioggia", value: cavanis.rain != null ? cavanis.rain.toFixed(1) + " mm" : "n.d." },
+      { label: "Aggiornato", value: formatTime(cavanis.timestamp) }
+    ];
+
+    const html = rows
+      .map(r =>
+        `<div class="modal-row"><span class="modal-label">${r.label}</span><span class="modal-value">${r.value}</span></div>`
+      )
+      .join("");
+
+    showModal("Osservatorio Cavanis", html);
+
+  } catch (err) {
+
+    console.error(err);
+    showModal("Osservatorio Cavanis", "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, l'API ARPA potrebbe essere temporaneamente offline.</p>");
   }
 }
 
@@ -741,14 +795,15 @@ async function loadAll() {
 
     document.getElementById("status").innerHTML =
       "Aggiornato alle " +
-      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) +
+      " &middot; " + APP_VERSION;
 
   } catch (error) {
 
     console.error(error);
 
     document.getElementById("status").innerHTML =
-      "Errore caricamento dati";
+      "Errore caricamento dati &middot; " + APP_VERSION;
   }
 }
 
