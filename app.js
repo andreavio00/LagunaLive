@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.13";
+const APP_VERSION = "v2.14";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -158,7 +158,23 @@ function heatIndex(tempC, humidity) {
     0.00085282 * T * R * R -
     0.00000199 * T * T * R * R;
 
-  return (HI - 32) * 5 / 9; // torna in Celsius
+  const heatIndexC = (HI - 32) * 5 / 9; // torna in Celsius
+
+  // La regressione di Rothfusz e' ufficialmente valida (calibrata sui
+  // dati di Steadman) solo per umidita' relativa >= 40%. Al di sotto,
+  // il risultato e' un'estrapolazione della formula: puo' scendere
+  // sotto la temperatura dell'aria in modo sempre piu' marcato quanto
+  // piu' l'umidita' e' bassa, senza che questo rifletta piu' un
+  // fenomeno fisico reale. Entro il range valido (RH >= 40%) la
+  // formula non ha invece bisogno di alcun aggiustamento: puo'
+  // legittimamente restituire un valore leggermente sotto la
+  // temperatura dell'aria (evaporazione del sudore efficiente), e in
+  // quel caso lo lasciamo cosi' com'e'.
+  if (humidity < 40) {
+    return Math.max(heatIndexC, tempC);
+  }
+
+  return heatIndexC;
 }
 
 const VENICE_LAT = 45.4408;
