@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Previsioni Laguna — Venezia</title>
+<style>
+  :root{
+    --deep:#0F3D3E;
+    --deep2:#0B2E2F;
+    --tide:#2E6F77;
+    --foam:#F6F5F0;
+    --paper:#FBFAF6;
+    --amber:#E8A24B;
+    --rust:#C1502E;
+    --ink:#1B1B18;
+    --ink-soft:#5B6664;
+    --line: rgba(15,61,62,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--deep2);
+    background-image:
+      radial-gradient(ellipse at top, rgba(46,111,119,0.35), transparent 60%),
+      linear-gradient(180deg, var(--deep2), var(--deep) 30%, var(--deep2) 100%);
+    color:var(--foam);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  @font-face{
+    font-family:"Fraunces-fallback";
+    src:local("Georgia");
+  }
+  header{
+    padding:32px 20px 20px;
+    text-align:left;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--amber);
+    font-weight:600;
+    margin:0 0 8px;
+  }
+  h1{
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight:600;
+    font-style:italic;
+    font-size:34px;
+    line-height:1.05;
+    margin:0 0 6px;
+    color:var(--foam);
+  }
+  .subtitle{
+    font-size:14px;
+    color:rgba(246,245,240,0.65);
+    margin:0;
+    max-width:36em;
+  }
+  .updated{
+    font-size:12px;
+    color:rgba(246,245,240,0.45);
+    margin-top:14px;
+  }
+
+  /* Consensus meter — signature element */
+  .consensus{
+    margin:22px 20px 8px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:14px;
+    padding:16px 18px 18px;
+  }
+  .consensus-label{
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:rgba(246,245,240,0.55);
+    margin-bottom:10px;
+  }
+  .consensus-bar{
+    display:flex;
+    height:10px;
+    border-radius:6px;
+    overflow:hidden;
+    background:rgba(255,255,255,0.08);
+  }
+  .consensus-seg{ height:100%; }
+  .consensus-legend{
+    display:flex;
+    justify-content:space-between;
+    margin-top:8px;
+    font-size:11px;
+    color:rgba(246,245,240,0.55);
+  }
+  .consensus-note{
+    font-size:13px;
+    margin-top:10px;
+    color:var(--foam);
+  }
+
+  main{ padding:0 20px; }
+
+  .card{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:16px;
+    margin:16px 0;
+    padding:18px 18px 16px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+  }
+  .card-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    padding-bottom:10px;
+    margin-bottom:12px;
+  }
+  .card-title{
+    font-family: Georgia, serif;
+    font-style:italic;
+    font-size:19px;
+    margin:0;
+    color:var(--deep);
+  }
+  .card-tag{
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    background:rgba(15,61,62,0.08);
+    padding:3px 8px;
+    border-radius:20px;
+  }
+  .status{ font-size:13px; color:var(--ink-soft); padding:6px 0; }
+  .status.err{ color:var(--rust); }
+
+  /* Open-Meteo model comparison table */
+  table.models{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  table.models th, table.models td{
+    text-align:center;
+    padding:7px 4px;
+    border-bottom:1px solid var(--line);
+  }
+  table.models th{
+    font-weight:600;
+    color:var(--ink-soft);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  table.models td:first-child, table.models th:first-child{
+    text-align:left;
+    font-weight:600;
+    color:var(--deep);
+  }
+  .rain-pill{
+    display:inline-block;
+    min-width:34px;
+    padding:2px 6px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:600;
+    color:#fff;
+  }
+
+  /* ARPAV bulletin */
+  .arpav-day{
+    display:flex;
+    gap:12px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    align-items:flex-start;
+  }
+  .arpav-day:last-child{ border-bottom:none; }
+  .arpav-date{
+    font-size:12px;
+    font-weight:600;
+    color:var(--tide);
+    min-width:58px;
+  }
+  .arpav-body .sky{ font-size:14px; color:var(--ink); margin:0 0 3px; }
+  .arpav-body .meta{ font-size:12px; color:var(--ink-soft); }
+  .arpav-body .temp{ font-weight:600; color:var(--deep); }
+
+  /* METAR */
+  .metar-raw{
+    font-family: "SF Mono", "Roboto Mono", monospace;
+    font-size:12px;
+    background:rgba(15,61,62,0.06);
+    border-radius:8px;
+    padding:10px 12px;
+    color:var(--deep);
+    word-break:break-all;
+    line-height:1.5;
+  }
+  .metar-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px 16px;
+    margin-top:12px;
+  }
+  .metar-item .k{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; }
+  .metar-item .v{ font-size:15px; font-weight:600; color:var(--deep); }
+
+  footer{
+    padding:24px 20px 10px;
+    font-size:11px;
+    color:rgba(246,245,240,0.4);
+    line-height:1.6;
+  }
+  footer a{ color:rgba(246,245,240,0.6); }
+
+  .reload-btn{
+    margin:4px 20px 0;
+    display:inline-block;
+    background:var(--amber);
+    color:var(--deep2);
+    border:none;
+    font-weight:600;
+    font-size:13px;
+    padding:10px 18px;
+    border-radius:24px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" style="display:inline-block;font-size:12px;color:rgba(246,245,240,0.55);text-decoration:none;margin-bottom:14px;">&larr; LagunaLive</a>
+  <p class="eyebrow">Venezia &amp; Laguna</p>
+  <h1>Previsioni a confronto</h1>
+  <p class="subtitle">Tre fonti indipendenti fianco a fianco: modelli meteorologici globali, il bollettino ufficiale ARPAV per l'area "Venezia e laguna", e l'osservazione in tempo reale dall'aeroporto Marco Polo.</p>
+  <p class="updated" id="updated-at">Caricamento…</p>
+  <button class="reload-btn" onclick="location.reload()">Aggiorna</button>
+</header>
+
+<div class="consensus" id="consensus-block" style="display:none">
+  <div class="consensus-label">Accordo tra i modelli — domani</div>
+  <div class="consensus-bar" id="consensus-bar"></div>
+  <div class="consensus-legend"><span>0% pioggia</span><span>100% pioggia</span></div>
+  <p class="consensus-note" id="consensus-note"></p>
+</div>
+
+<main>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 class="card-title">Modelli globali · Open&#8209;Meteo</h2>
+      <span class="card-tag">ECMWF · GFS · ICON</span>
+    </div>
+    <div class="status" id="om-status">Interrogo i modelli…</div>
+    <div id="om-content"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 class="card-title">Bollettino ARPAV</h2>
+      <span class="card-tag">Venezia e laguna</span>
+    </div>
+    <div class="status" id="arpav-status">Scarico il bollettino…</div>
+    <div id="arpav-content"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 class="card-title">METAR aeroporto</h2>
+      <span class="card-tag">LIPZ · Marco Polo</span>
+    </div>
+    <div class="status" id="metar-status">Interrogo la stazione…</div>
+    <div id="metar-content"></div>
+  </section>
+
+</main>
+
+<footer>
+  Dati: Open&#8209;Meteo (open-meteo.com, CC BY 4.0) · ARPAV, Servizio Centro Meteorologico (CC BY 4.0) · METAR via aviationweather.gov (NOAA, dominio pubblico).<br>
+  Coordinate: Venezia centro storico (45.4342N, 12.3388E).
+</footer>
+
+<script>
+const LAT = 45.4342, LON = 12.3388;
+
+function fmtTime(){
+  const d = new Date();
+  return d.toLocaleString('it-IT', {weekday:'short', hour:'2-digit', minute:'2-digit'});
+}
+document.getElementById('updated-at').textContent = 'Pagina caricata alle ' + fmtTime();
+
+function rainColor(p){
+  if(p >= 60) return '#C1502E';
+  if(p >= 30) return '#E8A24B';
+  if(p >= 10) return '#8FA998';
+  return '#2E6F77';
+}
+
+async function fetchJSON(url){
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function fetchTextWithProxy(url){
+  // Prova diretta, poi fallback su proxy CORS pubblici
+  const attempts = [
+    url,
+    'https://corsproxy.io/?' + encodeURIComponent(url),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+  ];
+  let lastErr;
+  for(const attempt of attempts){
+    try{
+      const res = await fetch(attempt);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.text();
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
+
+/* ---------- OPEN-METEO: multi-model comparison ---------- */
+async function loadOpenMeteo(){
+  const statusEl = document.getElementById('om-status');
+  const contentEl = document.getElementById('om-content');
+  try{
+    const models = [
+      {id:'ecmwf_ifs025', label:'ECMWF'},
+      {id:'gfs_seamless', label:'GFS'},
+      {id:'icon_seamless', label:'ICON'}
+    ];
+    const results = {};
+    for(const m of models){
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
+        + `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode`
+        + `&timezone=Europe%2FRome&forecast_days=5&models=${m.id}`;
+      const data = await fetchJSON(url);
+      results[m.label] = data.daily;
+    }
+
+    const days = results['ECMWF'].time;
+    let html = '<table class="models"><thead><tr><th>Giorno</th>';
+    models.forEach(m => html += `<th>${m.label}</th>`);
+    html += '</tr></thead><tbody>';
+
+    days.forEach((day, i) => {
+      const d = new Date(day + 'T12:00:00');
+      const label = d.toLocaleDateString('it-IT', {weekday:'short', day:'numeric'});
+      html += `<tr><td>${label}</td>`;
+      models.forEach(m => {
+        const daily = results[m.label];
+        const tmax = Math.round(daily.temperature_2m_max[i]);
+        const tmin = Math.round(daily.temperature_2m_min[i]);
+        const rain = daily.precipitation_probability_max[i];
+        html += `<td>${tmin}°/${tmax}°<br><span class="rain-pill" style="background:${rainColor(rain)}">${rain}%</span></td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    contentEl.innerHTML = html;
+    statusEl.style.display = 'none';
+
+    // consensus meter for "domani" (index 1)
+    const idx = 1;
+    const rains = models.map(m => results[m.label].precipitation_probability_max[idx]);
+    const avg = Math.round(rains.reduce((a,b)=>a+b,0)/rains.length);
+    const spread = Math.max(...rains) - Math.min(...rains);
+    const bar = document.getElementById('consensus-bar');
+    bar.innerHTML = '';
+    const seg = document.createElement('div');
+    seg.className = 'consensus-seg';
+    seg.style.width = avg + '%';
+    seg.style.background = rainColor(avg);
+    bar.appendChild(seg);
+    const rest = document.createElement('div');
+    rest.className = 'consensus-seg';
+    rest.style.width = (100-avg) + '%';
+    rest.style.background = 'rgba(255,255,255,0.08)';
+    bar.appendChild(rest);
+    const noteEl = document.getElementById('consensus-note');
+    if(spread <= 15){
+      noteEl.textContent = `I modelli concordano: probabilità di pioggia media ${avg}% (scarto ${spread} punti).`;
+    } else {
+      noteEl.textContent = `I modelli divergono su domani: da ${Math.min(...rains)}% a ${Math.max(...rains)}% di probabilità pioggia — giornata incerta.`;
+    }
+    document.getElementById('consensus-block').style.display = 'block';
+
+  }catch(e){
+    statusEl.textContent = 'Non riesco a contattare Open-Meteo al momento.';
+    statusEl.classList.add('err');
+  }
+}
+
+/* ---------- ARPAV: bollettino widget XML, zona "Venezia e laguna" ---------- */
+async function loadArpav(){
+  const statusEl = document.getElementById('arpav-status');
+  const contentEl = document.getElementById('arpav-content');
+  try{
+    const xmlUrl = 'https://www.arpa.veneto.it/risorse/data-bollettini/meteo/bollettini/it/xml/bollettino_widget.xml';
+    const text = await fetchTextWithProxy(xmlUrl);
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'text/xml');
+
+    const zones = Array.from(xml.getElementsByTagName('meteogram'));
+    const zone = zones.find(z => z.getAttribute('name') === 'Venezia e laguna') || zones.find(z => z.getAttribute('zoneid') === '11');
+
+    if(!zone){ throw new Error('Zona non trovata nel bollettino'); }
+
+    const dayNodes = Array.from(zone.getElementsByTagName('day'));
+    let html = '';
+    dayNodes.forEach(dn => {
+      const date = dn.getAttribute('date');
+      const time = dn.getAttribute('time');
+      const d = new Date(date + 'T12:00:00');
+      const dateLabel = d.toLocaleDateString('it-IT', {weekday:'short', day:'numeric', month:'short'});
+      const timeLabel = time === 'am' ? 'mattina' : time === 'pm' ? 'pomeriggio/sera' : 'giornata';
+
+      const skyNode = dn.getElementsByTagName('sky')[0];
+      const rainNode = dn.getElementsByTagName('rain')[0];
+      const tempNodes = Array.from(dn.getElementsByTagName('temp'));
+
+      const sky = skyNode ? skyNode.textContent : '';
+      const rainPerc = rainNode ? rainNode.getAttribute('perc') : '';
+      const rainDesc = rainNode ? rainNode.textContent : '';
+
+      let tempStr = '';
+      if(tempNodes.length){
+        const t = tempNodes[0];
+        const min = t.getAttribute('min');
+        const max = t.getAttribute('max');
+        if(min || max) tempStr = `<span class="temp">${min ? min+'° / ' : ''}${max}°</span> · `;
+      }
+
+      html += `<div class="arpav-day">
+        <div class="arpav-date">${dateLabel}<br><span style="font-weight:400;color:var(--ink-soft)">${timeLabel}</span></div>
+        <div class="arpav-body">
+          <p class="sky">${tempStr}${sky}</p>
+          <p class="meta">Pioggia ${rainPerc}: ${rainDesc}</p>
+        </div>
+      </div>`;
+    });
+
+    contentEl.innerHTML = html;
+    statusEl.style.display = 'none';
+  }catch(e){
+    statusEl.textContent = 'Bollettino ARPAV non raggiungibile al momento (possibile blocco CORS del sito). Puoi consultarlo direttamente su meteo.arpa.veneto.it.';
+    statusEl.classList.add('err');
+  }
+}
+
+/* ---------- METAR: Venice airport LIPZ via aviationweather.gov ---------- */
+async function loadMetar(){
+  const statusEl = document.getElementById('metar-status');
+  const contentEl = document.getElementById('metar-content');
+  try{
+    const url = 'https://aviationweather.gov/api/data/metar?ids=LIPZ&format=json';
+    let data;
+    try{
+      data = await fetchJSON(url);
+    }catch(e){
+      const text = await fetchTextWithProxy(url);
+      data = JSON.parse(text);
+    }
+    if(!data || !data.length){ throw new Error('Nessun dato METAR'); }
+    const m = data[0];
+
+    const raw = m.rawOb || '';
+    const temp = (m.temp !== undefined && m.temp !== null) ? m.temp + '°C' : '—';
+    const wind = (m.wdir !== undefined && m.wspd !== undefined) ? `${m.wdir}° · ${m.wspd} kt` : '—';
+    const visib = m.visib !== undefined ? m.visib + ' sm' : '—';
+    const obsTime = m.obsTime ? new Date(m.obsTime * 1000).toLocaleString('it-IT', {hour:'2-digit', minute:'2-digit', day:'numeric', month:'short'}) : '—';
+    const clouds = (m.clouds && m.clouds.length) ? m.clouds.map(c => `${c.cover} ${c.base ? c.base+'ft' : ''}`).join(', ') : 'sereno / non riportato';
+
+    contentEl.innerHTML = `
+      <div class="metar-raw">${raw}</div>
+      <div class="metar-grid">
+        <div class="metar-item"><div class="k">Osservazione</div><div class="v">${obsTime}</div></div>
+        <div class="metar-item"><div class="k">Temperatura</div><div class="v">${temp}</div></div>
+        <div class="metar-item"><div class="k">Vento</div><div class="v">${wind}</div></div>
+        <div class="metar-item"><div class="k">Visibilità</div><div class="v">${visib}</div></div>
+        <div class="metar-item" style="grid-column:1/-1"><div class="k">Nuvolosità</div><div class="v">${clouds}</div></div>
+      </div>
+    `;
+    statusEl.style.display = 'none';
+  }catch(e){
+    statusEl.textContent = 'METAR non disponibile al momento.';
+    statusEl.classList.add('err');
+  }
+}
+
+loadOpenMeteo();
+loadArpav();
+loadMetar();
+</script>
+</body>
+</html>
