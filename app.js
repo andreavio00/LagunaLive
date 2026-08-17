@@ -2,7 +2,7 @@
 // consegna insieme al numero della cache in sw.js. Impostato subito, in un
 // punto isolato: anche se loadAll() (il caricamento dei dati meteo) va in
 // errore, questo continua a comparire normalmente.
-const APP_VERSION = "v15";
+const APP_VERSION = "v16";
 
 function showAppVersion() {
   const el = document.getElementById("appVersion");
@@ -793,6 +793,25 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("sw.js")
+      .then((registration) => {
+
+        // Il browser controlla se sw.js e' cambiato solo periodicamente
+        // (anche una volta al giorno): forziamo un controllo subito ad
+        // ogni apertura, invece di aspettare quel ciclo automatico.
+        registration.update();
+
+        // Quando viene rilevata e attivata una versione piu' recente
+        // del service worker durante questa sessione, ricarica la
+        // pagina una volta sola cosi' l'aggiornamento si vede subito,
+        // senza dover cancellare manualmente la cache dal telefono.
+        let alreadyReloaded = false;
+
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (alreadyReloaded) return;
+          alreadyReloaded = true;
+          window.location.reload();
+        });
+      })
       .catch((err) => console.warn("Service worker non registrato:", err));
   });
 }
