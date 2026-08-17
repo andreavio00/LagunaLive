@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.17";
+const APP_VERSION = "v2.18";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -253,31 +253,6 @@ function vaporPressure(tempC, humidity) {
 }
 
 // Temperatura percepita "al sole". Il THSW di Davis Instruments e'
-// una formula proprietaria che il produttore non ha mai reso
-// pubblica, quindi non e' riproducibile esattamente: questa e' una
-// stima trasparente in stile THSW, verificata a mano nel foglio
-// "Indice_calore_AT_TH_SW_Steadman_Cavanis.xlsx" (colonna "THSW
-// Davis").
-//
-// Si parte dall'indice di calore "all'ombra" (Rothfusz) e si somma un
-// bonus dovuto all'irraggiamento diretto, pesato dall'altezza del
-// sole sull'orizzonte (nullo se il sole e' basso o sotto
-// l'orizzonte), a cui si sottrae un termine di raffreddamento dovuto
-// al vento:
-//
-//   THSW = HI + max(0, 0.02 * R * sin(h)) - 0.70 * V
-//
-// dove R e' la radiazione solare globale (W/mq), h l'altezza del sole
-// e V il vento (m/s, NON km/h: l'API ARPA restituisce il vento in
-// km/h, va quindi convertito da chi chiama questa funzione).
-//
-// "Al sole" e' un valore assoluto indipendente dall'indice di calore
-// "all'ombra": in condizioni di vento forte e poco sole il termine
-// del vento potrebbe farlo scendere sotto l'indice di calore, cosa
-// priva di senso fisico (il sole non puo' mai far percepire *meno*
-// caldo dell'ombra). Per questo il risultato finale non scende mai
-// sotto l'indice di calore, prendendo il maggiore dei due.
-// Temperatura percepita "al sole". Il THSW di Davis Instruments e'
 // una formula proprietaria mai resa pubblica dal produttore, quindi
 // non e' riproducibile esattamente. Questa e' un'approssimazione
 // verificata confrontando 46 letture orarie reali della stazione
@@ -287,8 +262,8 @@ function vaporPressure(tempC, humidity) {
 //
 // Formula: variante dell'Apparent Temperature di Steadman con
 // radiazione (T + 0.33*e - 0.70*V + 0.007*R*sin(h) - 4.00), dove V e'
-// il vento in m/s (l'API ARPA lo da' in km/h, va convertito da chi
-// chiama questa funzione), R la radiazione solare globale (W/mq) e h
+// il vento in m/s (unita' nativa del sensore Cavanis, nessuna
+// conversione da fare qui), R la radiazione solare globale (W/mq) e h
 // l'altezza del sole sull'orizzonte.
 //
 // IMPORTANTE: nessun vincolo che leghi il risultato all'indice di
@@ -491,9 +466,10 @@ async function loadCavanis() {
     humidity: parseFloat(lastHumidity.valore),
     radiation: radiationWm2,
     radiationTimestamp: lastRadiation ? lastRadiation.dataora : null,
-    // VVENTO10M e' gia' in km/h nell'API ARPA: nessuna conversione
-    // qui, chi consuma questo valore per formule che vogliono m/s
-    // (es. apparentTemperatureSun) deve dividere per 3.6.
+    // VVENTO10M e' in m/s (confermato dall'utente, e' l'unita' nativa
+    // del sensore): chi lo mostra in scheda deve moltiplicare per 3.6
+    // per ottenere km/h; le formule che vogliono m/s (es.
+    // apparentTemperatureSun) lo possono usare direttamente cosi'.
     windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
     windSpeedTimestamp: lastWindSpeed ? lastWindSpeed.dataora : null,
     windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null,
@@ -691,7 +667,7 @@ async function openCavanisModal() {
         label: "Vento",
         value:
           (cavanis.windDir != null && !isNaN(cavanis.windDir) ? windDirection(cavanis.windDir) + " " : "") +
-          (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed) ? Math.round(cavanis.windSpeed) + " km/h" : "n.d.")
+          (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed) ? Math.round(cavanis.windSpeed * 3.6) + " km/h" : "n.d.")
       },
       { label: "Radiazione solare", value: cavanis.radiation != null ? Math.round(cavanis.radiation) + " W/mq" : "n.d." },
       { label: "Pioggia", value: cavanis.rain != null ? cavanis.rain.toFixed(1) + " mm" : "n.d." },
@@ -798,13 +774,13 @@ async function loadAll() {
         cavanis.windSpeedTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
-      // cavanis.windSpeed arriva dall'API ARPA in km/h: la formula
-      // "al sole" vuole il vento in m/s, va quindi convertito qui
-      // (/ 3.6) prima di passarlo alla funzione.
+      // cavanis.windSpeed e' gia' in m/s (unita' nativa del sensore,
+      // confermato dall'utente): nessuna conversione da fare qui, la
+      // formula "al sole" vuole proprio m/s.
       thsw = apparentTemperatureSun(
         cavanis.temperature,
         cavanis.humidity,
-        windFresh ? cavanis.windSpeed / 3.6 : null,
+        windFresh ? cavanis.windSpeed : null,
         radiationFresh ? cavanis.radiation : null,
         radiationFresh ? cavanis.radiationTimestamp : null
       );
@@ -843,14 +819,14 @@ async function loadAll() {
 
     // --- Card 4: vento, pioggia, pressione ---
 
-    // cavanis.windSpeed e' gia' in km/h (unita' nativa dell'API ARPA):
-    // niente conversione qui, va solo arrotondato.
+    // cavanis.windSpeed e' in m/s (unita' nativa del sensore, confermato
+    // dall'utente): va convertito in km/h per la visualizzazione.
     document.getElementById("wind").innerHTML =
       (cavanis.windDir != null && !isNaN(cavanis.windDir)
         ? windDirection(cavanis.windDir) + " "
         : "") +
       (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed)
-        ? Math.round(cavanis.windSpeed) + " km/h"
+        ? Math.round(cavanis.windSpeed * 3.6) + " km/h"
         : "n.d.");
 
     const rainHourText =
