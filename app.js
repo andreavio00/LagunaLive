@@ -2,7 +2,8 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.15";
+const APP_VERSION = "v2.16";
+
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
 
@@ -762,14 +763,15 @@ async function loadAll() {
 
     document.getElementById("status").innerHTML =
       "Aggiornato alle " +
-      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) +
+      " &middot; " + APP_VERSION;
 
-  } catch (error) {
+  } catch (error) {in 
 
     console.error(error);
 
     document.getElementById("status").innerHTML =
-      "Errore caricamento dati";
+      "Errore caricamento dati &middot; " + APP_VERSION;
   }
 }
 
