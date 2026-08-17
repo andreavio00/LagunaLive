@@ -757,16 +757,14 @@ async function loadAll() {
 
     document.getElementById("status").innerHTML =
       "Aggiornato alle " +
-      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) +
-      " &middot; " + APP_VERSION;
+      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
   } catch (error) {
 
     console.error(error);
 
     document.getElementById("status").innerHTML =
-      "Errore caricamento dati" ;+
-      " &middot; " + APP_VERSION;
+      "Errore caricamento dati";
   }
 }
 
