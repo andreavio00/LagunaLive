@@ -253,10 +253,3 @@ h1 {
   font-weight: bold;
   text-align: right;
 }
-
-.app-version {
-  text-align: center;
-  font-size: 0.75em;
-  color: #999;
-  margin: 24px 0 8px 0;
-}
