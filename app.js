@@ -1,3 +1,16 @@
+// Numero di versione mostrato in fondo alla pagina. Va aggiornato ad ogni
+// consegna insieme al numero della cache in sw.js. Impostato subito, in un
+// punto isolato: anche se loadAll() (il caricamento dei dati meteo) va in
+// errore, questo continua a comparire normalmente.
+const APP_VERSION = "v15";
+
+function showAppVersion() {
+  const el = document.getElementById("appVersion");
+  if (el) {
+    el.textContent = "LagunaLive " + APP_VERSION;
+  }
+}
+
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
 
@@ -768,6 +781,7 @@ async function loadAll() {
   }
 }
 
+showAppVersion();
 setupInteractions();
 loadStationsConfig();
 loadAll();
