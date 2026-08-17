@@ -2,7 +2,7 @@
 // consegna insieme al numero della cache in sw.js. Impostato subito, in un
 // punto isolato: anche se loadAll() (il caricamento dei dati meteo) va in
 // errore, questo continua a comparire normalmente.
-const APP_VERSION = "v16";
+const APP_VERSION = "v17";
 
 function showAppVersion() {
   const el = document.getElementById("appVersion");
