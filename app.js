@@ -1,3 +1,8 @@
+// Numero di versione mostrato accanto all'orario di aggiornamento in
+// fondo alla pagina. Da allineare manualmente al numero della cache
+// in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
+// i due numeri restano sempre coerenti tra loro.
+const APP_VERSION = "v2.15";
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
 
