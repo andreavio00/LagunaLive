@@ -1,9 +1,3 @@
-// Numero di versione mostrato accanto all'orario di aggiornamento in
-// fondo alla pagina. Da allineare manualmente al numero della cache
-// in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
-// i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.15";
-
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
 
@@ -158,23 +152,7 @@ function heatIndex(tempC, humidity) {
     0.00085282 * T * R * R -
     0.00000199 * T * T * R * R;
 
-  const heatIndexC = (HI - 32) * 5 / 9; // torna in Celsius
-
-  // La regressione di Rothfusz e' ufficialmente valida (calibrata sui
-  // dati di Steadman) solo per umidita' relativa >= 40%. Al di sotto,
-  // il risultato e' un'estrapolazione della formula: puo' scendere
-  // sotto la temperatura dell'aria in modo sempre piu' marcato quanto
-  // piu' l'umidita' e' bassa, senza che questo rifletta piu' un
-  // fenomeno fisico reale. Entro il range valido (RH >= 40%) la
-  // formula non ha invece bisogno di alcun aggiustamento: puo'
-  // legittimamente restituire un valore leggermente sotto la
-  // temperatura dell'aria (evaporazione del sudore efficiente), e in
-  // quel caso lo lasciamo cosi' com'e'.
-  if (humidity < 40) {
-    return Math.max(heatIndexC, tempC);
-  }
-
-  return heatIndexC;
+  return (HI - 32) * 5 / 9; // torna in Celsius
 }
 
 const VENICE_LAT = 45.4408;
@@ -191,13 +169,7 @@ function degToRad(d) {
 // Negativo quando il sole e' sotto l'orizzonte (notte).
 function solarElevationSin(timestamp) {
 
-  // Il timestamp puo' arrivare sia come "YYYY-MM-DD HH:MM:SS" (spazio,
-  // formato usato altrove in questo file) sia come "YYYY-MM-DDTHH:MM:SS"
-  // (ISO con "T", formato effettivamente restituito per il campo
-  // dataora della radiazione dall'API ARPA): normalizziamo prima di
-  // separare data e ora, altrimenti con la "T" non c'e' nessuno spazio
-  // da trovare e timePart risulta undefined.
-  const [datePart, timePart] = timestamp.replace("T", " ").split(" ");
+  const [datePart, timePart] = timestamp.split(" ");
   const [year, month, day] = datePart.split("-").map(Number);
   const [hh, mm, ss] = timePart.split(":").map(Number);
 
@@ -232,56 +204,39 @@ function vaporPressure(tempC, humidity) {
 
 // Temperatura percepita "al sole". Il THSW di Davis Instruments e'
 // una formula proprietaria che il produttore non ha mai reso
-// pubblica, quindi non e' riproducibile esattamente: questa e' una
-// stima trasparente in stile THSW, verificata a mano nel foglio
-// "Indice_calore_AT_TH_SW_Steadman_Cavanis.xlsx" (colonna "THSW
-// Davis").
+// pubblica, quindi non e' riproducibile esattamente.
 //
-// Si parte dall'indice di calore "all'ombra" (Rothfusz) e si somma un
-// bonus dovuto all'irraggiamento diretto, pesato dall'altezza del
-// sole sull'orizzonte (nullo se il sole e' basso o sotto
-// l'orizzonte), a cui si sottrae un termine di raffreddamento dovuto
-// al vento:
+// Storia delle versioni precedenti:
+// 1) Termine solare 0.70 * radiazione / (vento + 10): sovrastimava
+//    mattina/sera presto perche' non teneva conto dell'angolo del sole
+//    (confermato dalla documentazione del Bureau of Meteorology
+//    australiano stesso).
+// 2) Bonus solare 0.007 * radiazione * sin(h) sommato all'indice di
+//    calore "all'ombra": risolveva il problema dell'angolo ma ignorava
+//    il vento, che invece pesa - verificato con un caso reale (11
+//    agosto, 09:34, 31.6°C, 53% UR, 480 W/mq, vento 0.44 m/s) dove il
+//    valore atteso "al sole" (37.8°C) tornava solo includendo il vento
+//    come termine indipendente, non legato alla radiazione.
 //
-//   THSW = HI + max(0, 0.02 * R * sin(h)) - 0.70 * V
+// Versione attuale: la formula completa dell'Apparent Temperature di
+// Steadman con radiazione, come riportata su Wikipedia/BOM:
+//   AT = T + 0.33*e - 0.70*V + 0.007*R*sin(h) - 4.00
+// dove V e' il vento (m/s) ed e' la pressione di vapore (hPa). Con il
+// caso di verifica sopra questa formula da' 37.75°C, praticamente
+// identico al valore atteso di 37.8°C.
 //
-// dove R e' la radiazione solare globale (W/mq), h l'altezza del sole
-// e V il vento (m/s, NON km/h: l'API ARPA restituisce il vento in
-// km/h, va quindi convertito da chi chiama questa funzione).
-//
-// "Al sole" e' un valore assoluto indipendente dall'indice di calore
-// "all'ombra": in condizioni di vento forte e poco sole il termine
-// del vento potrebbe farlo scendere sotto l'indice di calore, cosa
-// priva di senso fisico (il sole non puo' mai far percepire *meno*
-// caldo dell'ombra). Per questo il risultato finale non scende mai
-// sotto l'indice di calore, prendendo il maggiore dei due.
-// Temperatura percepita "al sole". Il THSW di Davis Instruments e'
-// una formula proprietaria mai resa pubblica dal produttore, quindi
-// non e' riproducibile esattamente. Questa e' un'approssimazione
-// verificata confrontando 46 letture orarie reali della stazione
-// Davis di Villar Perosa (TO) con diverse formule candidate: errore
-// medio assoluto ~2.4°C, il migliore trovato finora tra le varianti
-// testate.
-//
-// Formula: variante dell'Apparent Temperature di Steadman con
-// radiazione (T + 0.33*e - 0.70*V + 0.007*R*sin(h) - 4.00), dove V e'
-// il vento in m/s (l'API ARPA lo da' in km/h, va convertito da chi
-// chiama questa funzione), R la radiazione solare globale (W/mq) e h
-// l'altezza del sole sull'orizzonte.
-//
-// IMPORTANTE: nessun vincolo che leghi il risultato all'indice di
-// calore "all'ombra". Dai dati reali della centralina, di notte e con
-// vento anche debole il THSW scende regolarmente SOTTO l'indice di
-// calore (dispersione radiativa verso il cielo sereno): un vincolo
-// "mai sotto l'indice di calore" sarebbe quindi sbagliato, non solo
-// superfluo.
+// Essendo pero' una formula assoluta indipendente dall'indice di
+// calore "all'ombra" (Rothfusz, usato altrove in questa card), nei
+// casi limite le due formule potrebbero teoricamente scollegarsi come
+// successo in passato: per sicurezza "al sole" non scende mai sotto
+// "all'ombra", prendendo il maggiore dei due.
 function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radiationTimestamp) {
 
   const hi = heatIndex(tempC, humidity);
 
   if (
-    windSpeedMs == null || isNaN(windSpeedMs) ||
     radiationWm2 == null || isNaN(radiationWm2) ||
+    windSpeedMs == null || isNaN(windSpeedMs) ||
     !radiationTimestamp
   ) {
     return hi;
@@ -292,9 +247,26 @@ function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radi
   // valori dell'ordine di 1100 W/mq.
   const R = Math.max(0, Math.min(1100, radiationWm2));
   const sinH = Math.max(0, solarElevationSin(radiationTimestamp));
+
+  // Senza un vero contributo del sole (di notte, o radiazione nulla)
+  // "al sole" deve coincidere esattamente con "all'ombra": altrimenti,
+  // usando comunque la formula di Steadman, la differenza tra le due
+  // basi di calcolo (Rothfusz vs Steadman) creerebbe un falso bonus
+  // anche senza sole, cosa priva di senso fisico.
+  if (R <= 0 || sinH <= 0) {
+    return hi;
+  }
+
   const e = vaporPressure(tempC, humidity);
 
-  return tempC + 0.33 * e - 0.70 * windSpeedMs + 0.007 * R * sinH - 4.00;
+  const at =
+    tempC +
+    0.33 * e -
+    0.70 * windSpeedMs +
+    0.007 * R * sinH -
+    4.00;
+
+  return Math.max(hi, at);
 }
 
 // Le tabelle delle stazioni CPSM non hanno una riga di intestazione
@@ -337,22 +309,12 @@ function parseLastRowLabeled(text, labels, showUnknown = true) {
       return;
     }
 
-    const label = labels[i] || ("Colonna " + (i + 1));
-
-    let displayValue;
-    if (i === 0) {
-      displayValue = value !== "" ? formatDateTime(value) : "n.d.";
-    } else if (label.startsWith("Direzione vento") && value !== "" && !isNaN(parseFloat(value))) {
-      // La direzione arriva in gradi (es. "45"): la mostriamo nel
-      // formato a punti cardinali piu' leggibile, tenendo comunque i
-      // gradi tra parentesi per chi vuole il dato preciso.
-      const deg = parseFloat(value);
-      displayValue = windDirection(deg) + " (" + Math.round(deg) + "°)";
-    } else {
-      displayValue = value !== "" ? value : "n.d.";
-    }
-
-    rows.push({ label, value: displayValue });
+    rows.push({
+      label: labels[i] || ("Colonna " + (i + 1)),
+      value: i === 0
+        ? (value !== "" ? formatDateTime(value) : "n.d.")
+        : (value !== "" ? value : "n.d.")
+    });
   });
 
   return rows;
@@ -367,19 +329,44 @@ async function loadPalazzoCavalli() {
     .split("\n")
     .filter(line => line.startsWith("| 2026-"));
 
-  const lastRow = rows[rows.length - 1];
+  const parsedRows = rows.map(line => {
 
-  const cols = lastRow
-    .split("|")
-    .map(x => x.trim());
+    const cols = line.split("|").map(x => x.trim());
+
+    return {
+      timestamp: cols[1],
+      pressure: parseFloat(cols[2]),
+      temperature: parseFloat(cols[3]),
+      humidity: parseFloat(cols[4]),
+      radiation: parseFloat(cols[5]),
+      rain: parseFloat(cols[6])
+    };
+  });
+
+  const last = parsedRows[parsedRows.length - 1];
+
+  // Ogni lettura di pioggia rappresenta i 5 minuti tra una rilevazione
+  // e l'altra (confermato). Per la pioggia dell'ultima ora sommiamo
+  // tutte le letture entro 60 minuti dall'ultimo dato disponibile.
+  const latestTime = new Date(last.timestamp.replace(" ", "T") + "+01:00");
+
+  const rainLastHour = parsedRows
+    .filter(r => {
+      const t = new Date(r.timestamp.replace(" ", "T") + "+01:00");
+      const diffMinutes = (latestTime - t) / 60000;
+      return diffMinutes >= 0 && diffMinutes < 60;
+    })
+    .reduce((sum, r) => sum + (isNaN(r.rain) ? 0 : r.rain), 0);
+
+  // La tabella scaricata copre gia' le ultime 24 ore (confermato), quindi
+  // per il totale giornaliero basta sommare tutte le righe disponibili.
+  const rain24h = parsedRows
+    .reduce((sum, r) => sum + (isNaN(r.rain) ? 0 : r.rain), 0);
 
   return {
-    timestamp: cols[1],
-    pressure: parseFloat(cols[2]),
-    temperature: parseFloat(cols[3]),
-    humidity: parseFloat(cols[4]),
-    radiation: parseFloat(cols[5]),
-    rain: parseFloat(cols[6])
+    ...last,
+    rainLastHour,
+    rain24h
   };
 }
 
@@ -425,7 +412,6 @@ async function loadCavanis() {
   const lastRadiation = lastOfType("RADSOL");
   const lastWindSpeed = lastOfType("VVENTO10M");
   const lastWindDir = lastOfType("DVENTO10M");
-  const lastRain = lastOfType("PREC");
 
   // RADSOL e' in MJ/mq (energia cumulata nell'ultima ora), non in
   // W/mq (potenza istantanea) come serve alla formula della
@@ -444,14 +430,9 @@ async function loadCavanis() {
     humidity: parseFloat(lastHumidity.valore),
     radiation: radiationWm2,
     radiationTimestamp: lastRadiation ? lastRadiation.dataora : null,
-    // VVENTO10M e' gia' in km/h nell'API ARPA: nessuna conversione
-    // qui, chi consuma questo valore per formule che vogliono m/s
-    // (es. apparentTemperatureSun) deve dividere per 3.6.
     windSpeed: lastWindSpeed ? parseFloat(lastWindSpeed.valore) : null,
     windSpeedTimestamp: lastWindSpeed ? lastWindSpeed.dataora : null,
-    windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null,
-    // PREC e' gia' in mm, nessuna conversione necessaria.
-    rain: lastRain ? parseFloat(lastRain.valore) : null
+    windDir: lastWindDir ? parseFloat(lastWindDir.valore) : null
   };
 }
 
@@ -559,12 +540,8 @@ async function loadStationsConfig() {
 
     row.addEventListener("click", () => {
 
-      // Nota: la card principale in alto (temperatura) continua a
-      // linkare la pagina Meteonetwork tramite mainTempLink. Qui,
-      // nella lista delle stazioni, si mostra invece una scheda con
-      // i dati grezzi dell'API ARPA, come per le altre stazioni.
       if (station.type === "meteonetwork") {
-        openCavanisModal();
+        window.open(CAVANIS_URL, "_blank");
         return;
       }
 
@@ -619,50 +596,6 @@ async function openStationModal(title, url, labels, showUnknown = true) {
 
     console.error(err);
     showModal(title, "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>");
-  }
-}
-
-// Scheda dati ARPA per Osservatorio Cavanis, usata dalla lista
-// "Stazioni utilizzate" in fondo alla pagina. La card principale in
-// alto (temperatura) continua invece a linkare la pagina Meteonetwork
-// tramite mainTempLink/CAVANIS_URL: qui si tratta di una scheda
-// separata, coerente nello stile con le altre stazioni della lista
-// (Palazzo Cavalli, San Giorgio, Punta della Salute), ma con dati
-// presi dall'API ARPA invece che dalle pagine del Comune.
-async function openCavanisModal() {
-
-  showModal("Osservatorio Cavanis", "<p>Caricamento dati aggiornati...</p>");
-
-  try {
-
-    const cavanis = await loadCavanis();
-
-    const rows = [
-      { label: "Temperatura", value: cavanis.temperature != null ? cavanis.temperature.toFixed(1) + " °C" : "n.d." },
-      { label: "Umidità", value: cavanis.humidity != null ? cavanis.humidity.toFixed(0) + " %" : "n.d." },
-      {
-        label: "Vento",
-        value:
-          (cavanis.windDir != null && !isNaN(cavanis.windDir) ? windDirection(cavanis.windDir) + " " : "") +
-          (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed) ? Math.round(cavanis.windSpeed) + " km/h" : "n.d.")
-      },
-      { label: "Radiazione solare", value: cavanis.radiation != null ? Math.round(cavanis.radiation) + " W/mq" : "n.d." },
-      { label: "Pioggia", value: cavanis.rain != null ? cavanis.rain.toFixed(1) + " mm" : "n.d." },
-      { label: "Aggiornato", value: formatTime(cavanis.timestamp) }
-    ];
-
-    const html = rows
-      .map(r =>
-        `<div class="modal-row"><span class="modal-label">${r.label}</span><span class="modal-value">${r.value}</span></div>`
-      )
-      .join("");
-
-    showModal("Osservatorio Cavanis", html);
-
-  } catch (err) {
-
-    console.error(err);
-    showModal("Osservatorio Cavanis", "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, l'API ARPA potrebbe essere temporaneamente offline.</p>");
   }
 }
 
@@ -751,13 +684,10 @@ async function loadAll() {
         cavanis.windSpeedTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
 
-      // cavanis.windSpeed arriva dall'API ARPA in km/h: la formula
-      // "al sole" vuole il vento in m/s, va quindi convertito qui
-      // (/ 3.6) prima di passarlo alla funzione.
       thsw = apparentTemperatureSun(
         cavanis.temperature,
         cavanis.humidity,
-        windFresh ? cavanis.windSpeed / 3.6 : null,
+        windFresh ? cavanis.windSpeed : null,
         radiationFresh ? cavanis.radiation : null,
         radiationFresh ? cavanis.radiationTimestamp : null
       );
@@ -796,20 +726,26 @@ async function loadAll() {
 
     // --- Card 4: vento, pioggia, pressione ---
 
-    // cavanis.windSpeed e' gia' in km/h (unita' nativa dell'API ARPA):
-    // niente conversione qui, va solo arrotondato.
     document.getElementById("wind").innerHTML =
       (cavanis.windDir != null && !isNaN(cavanis.windDir)
         ? windDirection(cavanis.windDir) + " "
         : "") +
       (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed)
-        ? Math.round(cavanis.windSpeed) + " km/h"
+        ? Math.round(cavanis.windSpeed * 3.6) + " km/h"
         : "n.d.");
 
-    document.getElementById("rain").innerHTML =
-      cavanis.rain != null && !isNaN(cavanis.rain)
-        ? cavanis.rain.toFixed(1) + " mm"
+    const rainHourText =
+      cavalli.rainLastHour != null && !isNaN(cavalli.rainLastHour)
+        ? cavalli.rainLastHour.toFixed(1) + " mm/h"
         : "n.d.";
+
+    const rain24hText =
+      cavalli.rain24h != null && !isNaN(cavalli.rain24h)
+        ? cavalli.rain24h.toFixed(1) + " mm/24h"
+        : "n.d.";
+
+    document.getElementById("rain").innerHTML =
+      rainHourText + " &middot; " + rain24hText;
 
     document.getElementById("pressure").innerHTML =
       cavalli.pressure.toFixed(1) + " hPa";
@@ -821,15 +757,14 @@ async function loadAll() {
 
     document.getElementById("status").innerHTML =
       "Aggiornato alle " +
-      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) +
-      " &middot; " + APP_VERSION;
+      now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
   } catch (error) {
 
     console.error(error);
 
     document.getElementById("status").innerHTML =
-      "Errore caricamento dati &middot; " + APP_VERSION;
+      "Errore caricamento dati";
   }
 }
 
