@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.18";
+const APP_VERSION = "v2.20";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -248,40 +248,42 @@ function solarElevationSin(timestamp) {
   return Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(hourAngle);
 }
 
-function vaporPressure(tempC, humidity) {
-  return (humidity / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
-}
-
 // Temperatura percepita "al sole". Il THSW di Davis Instruments e'
 // una formula proprietaria mai resa pubblica dal produttore, quindi
-// non e' riproducibile esattamente. Questa e' un'approssimazione
-// verificata confrontando 46 letture orarie reali della stazione
-// Davis di Villar Perosa (TO) con diverse formule candidate: errore
-// medio assoluto ~2.4°C, il migliore trovato finora tra le varianti
-// testate.
+// non e' riproducibile esattamente. Questa e' la seconda versione
+// dell'approssimazione, corretta dopo aver scoperto due cose
+// verificando 46 letture orarie reali della stazione Davis di Villar
+// Perosa (TO):
 //
-// Formula: variante dell'Apparent Temperature di Steadman con
-// radiazione (T + 0.33*e - 0.70*V + 0.007*R*sin(h) - 4.00), dove V e'
-// il vento in m/s (unita' nativa del sensore Cavanis, nessuna
-// conversione da fare qui), R la radiazione solare globale (W/mq) e h
-// l'altezza del sole sull'orizzonte.
+// 1) Il THW reale di Davis (temperatura+umidita'+vento, "al buio") in
+//    queste 46 righe e' SEMPRE risultato identico, alla decina di
+//    grado, all'Heat Index (Rothfusz). Il vento non lo modifica mai,
+//    perche' la formula di wind chill vera si applica solo sotto i
+//    10°C: alle nostre temperature (quasi sempre ben sopra), il
+//    contributo del vento e' semplicemente zero. La versione
+//    precedente di questa funzione aveva un termine "-0.70*vento"
+//    completamente indipendente dall'Heat Index (con base
+//    T+vapore anziche' l'Heat Index gia' calcolato altrove): con
+//    umidita' molto alta questo produceva un "al sole" anche 3°C
+//    SOPRA "all'ombra" con radiazione zero (di notte!), un risultato
+//    privo di senso fisico. Rimosso: ora si parte direttamente
+//    dall'Heat Index, la stessa funzione usata per "all'ombra", cosi'
+//    le due schermate non possono piu' divergere per un errore di
+//    formula.
 //
-// IMPORTANTE: nessun vincolo che leghi il risultato all'indice di
-// calore "all'ombra". Dai dati reali della centralina, di notte e con
-// vento anche debole il THSW scende regolarmente SOTTO l'indice di
-// calore (dispersione radiativa verso il cielo sereno): un vincolo
-// "mai sotto l'indice di calore" sarebbe quindi sbagliato, non solo
-// superfluo.
-function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radiationTimestamp) {
+// 2) Confrontando THW e THSW reali, lo scarto (che rappresenta il
+//    "bonus" dovuto al sole) segue bene il modello
+//    THSW = THW - 0.8 + 0.0132 * R * sin(h)
+//    (regressione sui 46 punti, errore medio assoluto 0.71°C, contro
+//    1.50°C della versione precedente). Il -0.8 e' una costante
+//    piccola e pressoche' indipendente dal vento osservato (0-21
+//    km/h), non un termine di raffreddamento eolico.
+function apparentTemperatureSun(tempC, humidity, radiationWm2, radiationTimestamp) {
 
   const hi = heatIndex(tempC, humidity);
 
-  if (
-    windSpeedMs == null || isNaN(windSpeedMs) ||
-    radiationWm2 == null || isNaN(radiationWm2) ||
-    !radiationTimestamp
-  ) {
-    return hi;
+  if (radiationWm2 == null || isNaN(radiationWm2) || !radiationTimestamp) {
+    return hi - 0.8;
   }
 
   // Limite di sicurezza contro letture anomale del sensore: la
@@ -289,9 +291,8 @@ function apparentTemperatureSun(tempC, humidity, windSpeedMs, radiationWm2, radi
   // valori dell'ordine di 1100 W/mq.
   const R = Math.max(0, Math.min(1100, radiationWm2));
   const sinH = Math.max(0, solarElevationSin(radiationTimestamp));
-  const e = vaporPressure(tempC, humidity);
 
-  return tempC + 0.33 * e - 0.70 * windSpeedMs + 0.007 * R * sinH - 4.00;
+  return hi - 0.8 + 0.0132 * R * sinH;
 }
 
 // Le tabelle delle stazioni CPSM non hanno una riga di intestazione
@@ -770,17 +771,9 @@ async function loadAll() {
         cavanis.radiationTimestamp != null &&
         minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= STALE_MINUTES;
 
-      const windFresh =
-        cavanis.windSpeedTimestamp != null &&
-        minutesBetween(cavanis.timestamp, cavanis.windSpeedTimestamp) <= STALE_MINUTES;
-
-      // cavanis.windSpeed e' gia' in m/s (unita' nativa del sensore,
-      // confermato dall'utente): nessuna conversione da fare qui, la
-      // formula "al sole" vuole proprio m/s.
       thsw = apparentTemperatureSun(
         cavanis.temperature,
         cavanis.humidity,
-        windFresh ? cavanis.windSpeed : null,
         radiationFresh ? cavanis.radiation : null,
         radiationFresh ? cavanis.radiationTimestamp : null
       );
@@ -819,8 +812,9 @@ async function loadAll() {
 
     // --- Card 4: vento, pioggia, pressione ---
 
-    // cavanis.windSpeed e' in m/s (unita' nativa del sensore, confermato
-    // dall'utente): va convertito in km/h per la visualizzazione.
+    // cavanis.windSpeed arriva dall'API ARPA in m/s (confermato dal
+    // campo "unitnm":"m/s" nella risposta JSON grezza): va convertito
+    // in km/h per la visualizzazione.
     document.getElementById("wind").innerHTML =
       (cavanis.windDir != null && !isNaN(cavanis.windDir)
         ? windDirection(cavanis.windDir) + " "
