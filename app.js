@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.21";
+const APP_VERSION = "v2.22";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -740,11 +740,11 @@ async function loadAll() {
 
     document.getElementById("subCavalli").innerHTML =
       "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
-      " °C (" + formatTime(cavalli.timestamp) + ")";
+      " °C (🕐 " + formatTime(cavalli.timestamp) + ")";
 
     document.getElementById("subSanGiorgio").innerHTML =
       "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
-      " °C (" + formatTime(sanGiorgio.timestamp) + ")";
+      " °C (🕐 " + formatTime(sanGiorgio.timestamp) + ")";
 
     // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
 
@@ -793,8 +793,8 @@ async function loadAll() {
       "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
 
     document.getElementById("humidityDetails").innerHTML = `
-<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepito ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
-<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; percepito ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (🕐 ${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (🕐 ${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
 `;
 
     // --- Card 3: mare ---
@@ -875,6 +875,19 @@ if ("serviceWorker" in navigator) {
         // (anche una volta al giorno): forziamo un controllo subito ad
         // ogni apertura, invece di aspettare quel ciclo automatico.
         registration.update();
+
+        // Quando l'app installata (icona in home) torna in primo piano
+        // dopo essere stata in background, spesso Android/Chrome si
+        // limita a riattivare l'istanza gia' in memoria senza un vero
+        // evento "load": senza questo, il controllo aggiornamento
+        // sopra non scatterebbe mai in quei casi, e la PWA potrebbe
+        // restare indietro finche' non viene chiusa e riaperta da zero
+        // (o aperta nello stesso browser da una scheda normale).
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            registration.update();
+          }
+        });
 
         // Quando viene rilevata e attivata una versione piu' recente
         // del service worker durante questa sessione, ricarica la
