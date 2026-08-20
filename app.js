@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.23";
+const APP_VERSION = "v2.24";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -736,15 +736,15 @@ async function loadAll() {
       cavanis.temperature.toFixed(1) + " °C";
 
     document.getElementById("tempStation").innerHTML =
-      "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
+      "Osservatorio Cavanis &middot; 🕐 " + formatTime(cavanis.timestamp);
 
     document.getElementById("subCavalli").innerHTML =
       "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
-      " °C (🕐 " + formatTime(cavalli.timestamp) + ")";
+      " °C (" + formatTime(cavalli.timestamp) + ")";
 
     document.getElementById("subSanGiorgio").innerHTML =
       "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
-      " °C (🕐 " + formatTime(sanGiorgio.timestamp) + ")";
+      " °C (" + formatTime(sanGiorgio.timestamp) + ")";
 
     // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
 
@@ -790,11 +790,11 @@ async function loadAll() {
       thsw.toFixed(1) + " °C";
 
     document.getElementById("humidityStation").innerHTML =
-      "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
+      "Osservatorio Cavanis &middot; 🕐 " + formatTime(cavanis.timestamp);
 
     document.getElementById("humidityDetails").innerHTML = `
-<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (🕐 ${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
-<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (🕐 ${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
 `;
 
     // --- Card 3: mare ---
@@ -904,3 +904,38 @@ if ("serviceWorker" in navigator) {
       .catch((err) => console.warn("Service worker non registrato:", err));
   });
 }
+
+// Pulsante "Forza aggiornamento app": rete di sicurezza per i casi in
+// cui l'app installata (icona in home) resta indietro nonostante i
+// controlli automatici sopra - un problema noto delle PWA su Android,
+// dove il sistema puo' ritardare l'aggiornamento del service worker
+// indipendentemente da cosa fa questo codice. A differenza del
+// normale ciclo di aggiornamento (che aspetta una nuova versione),
+// questo cancella TUTTO incondizionatamente (service worker + cache)
+// e ricarica da zero, cosi' funziona anche se per qualche motivo il
+// controllo automatico non ha mai rilevato la nuova versione.
+document.getElementById("forceUpdateLink").addEventListener("click", async () => {
+
+  const link = document.getElementById("forceUpdateLink");
+  link.textContent = "🔄 Aggiornamento in corso...";
+
+  try {
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((r) => r.unregister()));
+    }
+
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+    }
+
+  } catch (err) {
+    console.warn("Errore durante la pulizia forzata:", err);
+  }
+
+  // Il "true" forza il browser a ignorare qualsiasi copia in cache
+  // anche per il ricaricamento stesso della pagina HTML.
+  window.location.reload(true);
+});

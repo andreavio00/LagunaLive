@@ -18,6 +18,14 @@ h1 {
   min-height: 1.2em;
 }
 
+.force-update-link {
+  color: #888;
+  font-size: 0.8em;
+  margin-bottom: 16px;
+  text-decoration: underline;
+  display: inline-block;
+}
+
 .card {
   background: white;
   padding: 14px 16px;
