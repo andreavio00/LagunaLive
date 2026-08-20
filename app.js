@@ -793,8 +793,8 @@ async function loadAll() {
       "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
 
     document.getElementById("humidityDetails").innerHTML = `
-<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (🕐 ${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
-<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (🕐 ${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (🕐 ${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; Percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (🕐 ${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; Perceoiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
 `;
 
     // --- Card 3: mare ---
