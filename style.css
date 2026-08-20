@@ -96,6 +96,15 @@ h1 {
   color: #333;
   padding: 4px 6px;
   margin: 2px -6px;
+  white-space: nowrap;
+  overflow-x: auto;
+  /* Nasconde la scrollbar quando serve (Firefox/Chrome): lo scroll
+     resta comunque utilizzabile col dito, semplicemente invisibile. */
+  scrollbar-width: none;
+}
+
+.sub-station::-webkit-scrollbar {
+  display: none;
 }
 
 .sub-station-extra {

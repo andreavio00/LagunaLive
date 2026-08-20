@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.22";
+const APP_VERSION = "v2.23";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -793,8 +793,8 @@ async function loadAll() {
       "Osservatorio Cavanis &middot; " + formatTime(cavanis.timestamp);
 
     document.getElementById("humidityDetails").innerHTML = `
-<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (🕐 ${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; Percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
-<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (🕐 ${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; Perceoiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (🕐 ${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
+<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (🕐 ${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; Temp. perc. ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
 `;
 
     // --- Card 3: mare ---
