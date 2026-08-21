@@ -12,9 +12,9 @@
       "id": "misericordia",
       "name": "Misericordia",
       "type": "cpsm",
-      "role": "tide_backup",
+      "role": "tide_backup_wind_primary",
       "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html",
-      "measures": ["tide"]
+      "measures": ["tide", "wind"]
     },
     {
       "id": "palazzo_cavalli",
@@ -39,6 +39,14 @@
       "role": "urban",
       "url": "",
       "measures": ["temperature", "humidity"]
+    },
+    {
+      "id": "lido_meteo",
+      "name": "Lido Meteo",
+      "type": "isprambiente",
+      "role": "urban",
+      "url": "",
+      "measures": ["temperature", "humidity", "wind", "pressure", "rain"]
     }
   ]
 }

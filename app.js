@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.24";
+const APP_VERSION = "v2.25";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -21,6 +21,27 @@ const MISERICORDIA_URL =
 
 const CAVANIS_API_URL =
   "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
+
+// File XML "grezzo" dietro la webgis ISPRA (RMLV): contiene tutte le
+// stazioni della rete con l'ultimo dato disponibile per ogni
+// strumento. Trovato analizzando il sorgente di webgis.html (funzione
+// initialDownload -> downloadUrl("../dati/Dati2.xml", ...)). Nessuna
+// documentazione ufficiale, nessuna garanzia di stabilita' nel tempo:
+// se ISPRA cambia il sito questo endpoint puo' smettere di funzionare
+// senza preavviso.
+const ISPRAMBIENTE_DATI_URL =
+  "https://www.venezia.isprambiente.it/dati/Dati2.xml";
+
+// id della stazione "Lido Meteo" nel file Dati2.xml (marker id="115"),
+// confermato dall'utente incollando il contenuto reale del file.
+const LIDO_METEO_MARKER_ID = "115";
+
+// Sopra questa soglia (minuti) i dati di Lido Meteo vengono mostrati
+// con un avviso "dati non aggiornati" invece che silenziosamente come
+// se fossero freschi: la rete RMLV ha gia' mostrato di poter restare
+// ferma per giorni senza preavviso (vedi cronologia di questa
+// conversazione, dati fermi al 17/08 quando si e' controllato il 21/08).
+const LIDO_METEO_STALE_MINUTES = 120;
 
 // Etichette delle colonne cosi' come compaiono nelle tabelle delle
 // stazioni CPSM (prima colonna = data/ora, poi le altre nell'ordine in
@@ -51,13 +72,26 @@ const PUNTA_SALUTE_LABELS = [
   "Temperatura acqua (°C)"
 ];
 
-// Etichette non verificate direttamente sul sito (nessuno screenshot
-// di riferimento come per Cavalli/San Giorgio/Punta Salute): se
-// l'ordine reale delle colonne fosse diverso, le colonne in eccesso
-// compariranno comunque come "Colonna N" invece di rompere la scheda.
+// Etichette NON verificate su uno screenshot reale della pagina (a
+// differenza di Cavalli/San Giorgio/Punta Salute). Dedotte per
+// analogia: la pagina "10. Misericordia" del Comune elenca i sensori
+// installati come mareografo + anemometro + ondametro (niente
+// termometro/igrometro/barometro), e l'ordine delle colonne di
+// San Giorgio (verificato) segue lo stesso ordine "canonico" descritto
+// nella pagina generale dei parametri di rete (Liv, DV, VV, VVx, Pr,
+// T aria, T H2O, Um, Pg, Rs, O Hs, O Hx) filtrato ai soli sensori
+// presenti nella stazione. Marea come prima colonna dati e' gia'
+// verificato (funziona da tempo come backup marea). Le colonne vento e
+// onda sono INFERITE, non confermate: da ricontrollare al primo avvio
+// reale confrontando con le condizioni di vento note al momento.
 const MISERICORDIA_LABELS = [
   "Data/Ora",
-  "Marea (m)"
+  "Marea (m)",
+  "Direzione vento (°)",
+  "Velocità vento (m/s)",
+  "Raffica vento (m/s)",
+  "Onda significativa (m)",
+  "Onda massima (m)"
 ];
 
 const STATION_LABELS = {
@@ -112,6 +146,37 @@ function formatDateTime(timestamp) {
       minute: "2-digit"
     }
   );
+}
+
+// Il file Dati2.xml di ISPRA usa un formato data diverso da quello
+// delle tabelle CPSM/ARPA usate altrove in questo file: "DD/MM/YYYY
+// HH:MM:SS" invece di "YYYY-MM-DD HH:MM:SS". L'ora e' comunque solare
+// (UTC+1) come tutte le altre fonti, quindi la conversione a ora
+// civile e' la stessa (+01:00, lasciamo fare al browser la conversione
+// a ora legale quando serve).
+function parseIsprambienteTimestamp(timestamp) {
+
+  const [datePart, timePart] = timestamp.trim().split(" ");
+  const [day, month, year] = datePart.split("/");
+
+  return new Date(`${year}-${month}-${day}T${timePart}+01:00`);
+}
+
+function formatTimeIsprambiente(timestamp) {
+
+  return parseIsprambienteTimestamp(timestamp).toLocaleTimeString(
+    "it-IT",
+    { hour: "2-digit", minute: "2-digit" }
+  );
+}
+
+// Minuti trascorsi da un timestamp ISPRA ad ora (usato per l'avviso
+// "dati non aggiornati" di Lido Meteo).
+function minutesSinceIsprambiente(timestamp) {
+
+  const then = parseIsprambienteTimestamp(timestamp);
+
+  return (Date.now() - then.getTime()) / 60000;
 }
 
 function windDirection(deg) {
@@ -479,6 +544,102 @@ async function loadCavanis() {
   };
 }
 
+// Legge temperatura e umidita' della stazione "Lido Meteo" (RMLV,
+// ISPRA) dal file Dati2.xml. A differenza delle altre loadXxx() di
+// questo file, questa NON lancia mai un'eccezione verso l'esterno: se
+// fallisce (dominio offline, CORS bloccato dal browser, XML non
+// trovato, stazione assente) restituisce semplicemente
+// { available: false }, cosi' un problema con questa singola fonte non
+// puo' mai bloccare il caricamento delle altre card. Non e' ancora
+// stato verificato se il dominio isprambiente.it espone gli header
+// CORS necessari per un fetch diretto dal browser: se in pratica
+// risulta bloccato, la soluzione e' la stessa gia' in uso per le
+// pagine CPSM (proxy https://r.jina.ai/ davanti all'URL) o uno
+// scraper GitHub Actions come per meteo-fassa.
+async function loadLidoMeteo() {
+
+  try {
+
+    const response = await fetch(ISPRAMBIENTE_DATI_URL);
+    const text = await response.text();
+
+    const xml = new DOMParser().parseFromString(text, "text/xml");
+
+    if (xml.querySelector("parsererror")) {
+      throw new Error("XML di Dati2.xml non valido");
+    }
+
+    const markers = xml.getElementsByTagName("marker");
+
+    let marker = null;
+    for (let i = 0; i < markers.length; i++) {
+      if (markers[i].getAttribute("id") === LIDO_METEO_MARKER_ID) {
+        marker = markers[i];
+        break;
+      }
+    }
+
+    if (!marker) {
+      throw new Error("Stazione Lido Meteo (id " + LIDO_METEO_MARKER_ID + ") non trovata in Dati2.xml");
+    }
+
+    const instruments = marker.getElementsByTagName("instrument");
+
+    let temperature = null;
+    let humidity = null;
+    let windDir = null;
+    let windSpeed = null;
+    let pressure = null;
+    let rain = null;
+    let timestamp = null;
+
+    for (let i = 0; i < instruments.length; i++) {
+
+      const instr = instruments[i];
+      const valueEl = instr.getElementsByTagName("value")[0];
+
+      if (!valueEl) continue;
+
+      const type = instr.getAttribute("type");
+      const value = parseFloat(valueEl.textContent.trim());
+      const ts = valueEl.getAttribute("datetime");
+
+      // Tutti gli strumenti di questa stazione condividono lo stesso
+      // datetime (rilevazione istantanea unica per ciclo): ne basta
+      // uno qualsiasi per l'avviso di aggiornamento.
+      if (timestamp == null) timestamp = ts;
+
+      if (type === "Temperatura") temperature = value;
+      else if (type === "Umid") humidity = value;
+      else if (type === "Vento dir.") windDir = value;
+      else if (type === "Vento vel.") windSpeed = value;
+      else if (type === "Press") pressure = value;
+      else if (type === "Pioggia") rain = value;
+    }
+
+    if (temperature == null && humidity == null) {
+      throw new Error("Nessun dato di temperatura/umidita' per Lido Meteo in Dati2.xml");
+    }
+
+    return {
+      available: true,
+      temperature,
+      humidity,
+      windDir,
+      windSpeed,
+      pressure,
+      rain,
+      timestamp,
+      stale: timestamp != null && minutesSinceIsprambiente(timestamp) > LIDO_METEO_STALE_MINUTES
+    };
+
+  } catch (err) {
+
+    console.warn("Lido Meteo non disponibile:", err);
+    return { available: false };
+  }
+}
+
 async function loadPuntaSalute() {
 
   const response = await fetch(PUNTA_SALUTE_URL);
@@ -515,28 +676,51 @@ async function loadPuntaSalute() {
   };
 }
 
-async function loadMisericordia() {
+// Scarica e fa il parsing COMPLETO della tabella di Misericordia
+// (tutte le righe disponibili, non solo l'ultima): serve sia per la
+// marea di backup sia, soprattutto, per il grafico del vento che
+// mostra l'andamento nel tempo e non solo l'ultimo valore. Le colonne
+// vento/onda sono INFERITE (vedi commento su MISERICORDIA_LABELS): se
+// l'ordine reale fosse diverso, direzione/velocita'/raffica
+// risulterebbero scambiate tra loro.
+async function loadMisericordiaTable() {
 
   const response = await fetch(MISERICORDIA_URL);
   const text = await response.text();
 
   const rows = text
     .split("\n")
-    .filter(line => line.startsWith("| 2026-"));
+    .filter(line => /^\|\s*\d{4}-\d{2}-\d{2}/.test(line))
+    .map(line => {
 
-  const lastRow = rows[rows.length - 1];
-  const previousRow = rows[rows.length - 3];
+      const cols = line.split("|").map(x => x.trim());
 
-  const cols = lastRow
-    .split("|")
-    .map(x => x.trim());
+      return {
+        timestamp: cols[1],
+        tide: parseFloat(cols[2]),
+        windDir: parseFloat(cols[3]),
+        windSpeed: parseFloat(cols[4]),
+        windGust: parseFloat(cols[5]),
+        waveHeight: parseFloat(cols[6])
+      };
+    });
 
-  const prevCols = previousRow
-    .split("|")
-    .map(x => x.trim());
+  if (rows.length === 0) {
+    throw new Error("Nessuna riga dati trovata per Misericordia");
+  }
 
-  const tide = Math.round(parseFloat(cols[2]) * 100);
-  const prevTide = Math.round(parseFloat(prevCols[2]) * 100);
+  return rows;
+}
+
+async function loadMisericordia() {
+
+  const rows = await loadMisericordiaTable();
+
+  const last = rows[rows.length - 1];
+  const previous = rows[rows.length - 3] || rows[rows.length - 2] || last;
+
+  const tide = Math.round(last.tide * 100);
+  const prevTide = Math.round(previous.tide * 100);
 
   let trend = "→";
 
@@ -544,7 +728,7 @@ async function loadMisericordia() {
   if (tide < prevTide) trend = "↓";
 
   return {
-    timestamp: cols[1],
+    timestamp: last.timestamp,
     tide,
     trend,
     source: "Misericordia",
@@ -564,6 +748,33 @@ async function loadTide() {
 
     console.warn("Punta Salute non disponibile, uso Misericordia");
     return await loadMisericordia();
+  }
+}
+
+// Ultimo dato di vento di Misericordia per la card principale.
+// Non lancia mai un'eccezione verso l'esterno (stesso principio di
+// loadLidoMeteo): se Misericordia non e' raggiungibile, il vento
+// mostra semplicemente "n.d." invece di rompere il caricamento di
+// tutta la pagina.
+async function loadMisericordiaWind() {
+
+  try {
+
+    const rows = await loadMisericordiaTable();
+    const last = rows[rows.length - 1];
+
+    return {
+      available: true,
+      timestamp: last.timestamp,
+      windDir: last.windDir,
+      windSpeed: last.windSpeed,
+      windGust: last.windGust
+    };
+
+  } catch (err) {
+
+    console.warn("Vento Misericordia non disponibile:", err);
+    return { available: false };
   }
 }
 
@@ -589,6 +800,11 @@ async function loadStationsConfig() {
       // i dati grezzi dell'API ARPA, come per le altre stazioni.
       if (station.type === "meteonetwork") {
         openCavanisModal();
+        return;
+      }
+
+      if (station.type === "isprambiente") {
+        openLidoMeteoModal();
         return;
       }
 
@@ -690,6 +906,242 @@ async function openCavanisModal() {
   }
 }
 
+// Scheda "Lido Meteo" (RMLV/ISPRA), stesso stile delle altre schede
+// stazione. Rifa' il fetch al click (dato fresco, coerente con
+// openCavanisModal) invece di riusare il valore gia' caricato in
+// pagina.
+async function openLidoMeteoModal() {
+
+  showModal("Lido Meteo", "<p>Caricamento dati aggiornati...</p>");
+
+  try {
+
+    const data = await loadLidoMeteo();
+
+    if (!data.available) {
+      throw new Error("Dati non disponibili");
+    }
+
+    const rows = [
+      { label: "Temperatura", value: data.temperature != null ? data.temperature.toFixed(1) + " °C" : "n.d." },
+      { label: "Umidità", value: data.humidity != null ? data.humidity.toFixed(0) + " %" : "n.d." },
+      {
+        label: "Vento",
+        value:
+          (data.windDir != null && !isNaN(data.windDir) ? windDirection(data.windDir) + " " : "") +
+          (data.windSpeed != null && !isNaN(data.windSpeed) ? Math.round(data.windSpeed * 3.6) + " km/h" : "n.d.")
+      },
+      { label: "Pressione", value: data.pressure != null ? data.pressure.toFixed(1) + " hPa" : "n.d." },
+      { label: "Pioggia", value: data.rain != null ? data.rain.toFixed(1) + " mm" : "n.d." },
+      {
+        label: "Aggiornato",
+        value: data.timestamp
+          ? formatTimeIsprambiente(data.timestamp) + (data.stale ? " ⚠️" : "")
+          : "n.d."
+      }
+    ];
+
+    const html = rows
+      .map(r =>
+        `<div class="modal-row"><span class="modal-label">${r.label}</span><span class="modal-value">${r.value}</span></div>`
+      )
+      .join("") +
+      (data.stale
+        ? '<p class="stale-warning" style="margin-top:10px;">⚠️ La stazione risulta ferma da più di 2 ore: la rete ISPRA/RMLV può restare offline per giorni senza preavviso.</p>'
+        : "");
+
+    showModal("Lido Meteo", html);
+
+  } catch (err) {
+
+    console.error(err);
+    showModal("Lido Meteo", "<p>Errore nel caricamento dei dati, oppure la rete ISPRA/RMLV è al momento offline (è già successo per giorni consecutivi in passato).</p>");
+  }
+}
+
+// Disegna un grafico vento (velocita' e raffica, in km/h) su canvas,
+// senza librerie esterne, coerente con lo stile "no-build" del
+// progetto. La direzione viene mostrata come piccole frecce ruotate
+// lungo l'asse del tempo invece che come terza linea, perche' un
+// valore angolare (0-360°) non e' leggibile insieme a due linee
+// lineari sullo stesso grafico.
+function drawWindChart(canvas, rows) {
+
+  const ctx = canvas.getContext("2d");
+
+  // Dimensiona il canvas alla larghezza reale mostrata a schermo,
+  // tenendo conto del devicePixelRatio per una resa nitida sugli
+  // schermi dei telefoni (altrimenti il canvas risulta sfocato).
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || 320;
+  const cssHeight = 220;
+
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.height = cssHeight + "px";
+
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const padding = { top: 16, right: 12, bottom: 44, left: 36 };
+  const plotWidth = cssWidth - padding.left - padding.right;
+  const plotHeight = cssHeight - padding.top - padding.bottom;
+
+  const speeds = rows.map(r => (isNaN(r.windSpeed) ? 0 : r.windSpeed * 3.6));
+  const gusts = rows.map(r => (isNaN(r.windGust) ? 0 : r.windGust * 3.6));
+
+  const maxVal = Math.max(1, ...speeds, ...gusts) * 1.15;
+
+  const xForIndex = (i) =>
+    padding.left + (i / Math.max(1, rows.length - 1)) * plotWidth;
+
+  const yForValue = (v) =>
+    padding.top + plotHeight - (v / maxVal) * plotHeight;
+
+  // Griglia orizzontale + etichette km/h
+  ctx.strokeStyle = "#eee";
+  ctx.fillStyle = "#888";
+  ctx.font = "11px Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
+  const gridLines = 4;
+  for (let i = 0; i <= gridLines; i++) {
+    const v = (maxVal / gridLines) * i;
+    const y = yForValue(v);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + plotWidth, y);
+    ctx.stroke();
+    ctx.fillText(Math.round(v) + "", padding.left - 6, y);
+  }
+
+  // Etichette orario sull'asse x (circa 5 tacche)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  const tickCount = Math.min(5, rows.length);
+  for (let t = 0; t < tickCount; t++) {
+    const i = Math.round((t / Math.max(1, tickCount - 1)) * (rows.length - 1));
+    const x = xForIndex(i);
+    ctx.fillText(formatMisericordiaTime(rows[i].timestamp), x, padding.top + plotHeight + 6);
+  }
+
+  // Linea raffica (dietro, piu' chiara)
+  ctx.strokeStyle = "#a8c3f0";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  gusts.forEach((v, i) => {
+    const x = xForIndex(i);
+    const y = yForValue(v);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Linea velocita' media (sopra, piu' scura)
+  ctx.strokeStyle = "#1a3c8f";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  speeds.forEach((v, i) => {
+    const x = xForIndex(i);
+    const y = yForValue(v);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Frecce di direzione, disegnate a intervalli regolari appena sotto
+  // l'asse x (una freccia ogni ~6 punti per non affollare il grafico).
+  const arrowStep = Math.max(1, Math.round(rows.length / 16));
+
+  ctx.strokeStyle = "#555";
+  ctx.fillStyle = "#555";
+  ctx.lineWidth = 1.5;
+
+  for (let i = 0; i < rows.length; i += arrowStep) {
+
+    const dir = rows[i].windDir;
+    if (dir == null || isNaN(dir)) continue;
+
+    const x = xForIndex(i);
+    const y = padding.top + plotHeight + 24;
+    const angle = degToRad(dir - 90); // 0° = Nord verso l'alto
+    const len = 6;
+
+    const x2 = x + Math.cos(angle) * len;
+    const y2 = y + Math.sin(angle) * len;
+
+    ctx.beginPath();
+    ctx.moveTo(x - Math.cos(angle) * len, y - Math.sin(angle) * len);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Piccola punta a freccia
+    const headAngle1 = angle + Math.PI * 0.8;
+    const headAngle2 = angle - Math.PI * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 + Math.cos(headAngle1) * 3, y2 + Math.sin(headAngle1) * 3);
+    ctx.lineTo(x2 + Math.cos(headAngle2) * 3, y2 + Math.sin(headAngle2) * 3);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// Formato orario per i timestamp di Misericordia (stesso formato
+// "YYYY-MM-DD HH:MM:SS" delle altre tabelle CPSM: riusa formatTime).
+function formatMisericordiaTime(timestamp) {
+  return formatTime(timestamp);
+}
+
+async function openWindChartModal() {
+
+  showModal("Vento &middot; Misericordia", "<p>Caricamento dati aggiornati...</p>");
+
+  try {
+
+    const rows = await loadMisericordiaTable();
+
+    if (rows.length === 0) {
+      throw new Error("Nessun dato disponibile");
+    }
+
+    const last = rows[rows.length - 1];
+
+    const summaryHtml = `
+<div class="modal-row"><span class="modal-label">Direzione</span><span class="modal-value">${!isNaN(last.windDir) ? windDirection(last.windDir) + " (" + Math.round(last.windDir) + "°)" : "n.d."}</span></div>
+<div class="modal-row"><span class="modal-label">Velocità</span><span class="modal-value">${!isNaN(last.windSpeed) ? Math.round(last.windSpeed * 3.6) + " km/h" : "n.d."}</span></div>
+<div class="modal-row"><span class="modal-label">Raffica</span><span class="modal-value">${!isNaN(last.windGust) ? Math.round(last.windGust * 3.6) + " km/h" : "n.d."}</span></div>
+<div class="modal-row"><span class="modal-label">Aggiornato</span><span class="modal-value">${formatTime(last.timestamp)}</span></div>
+`;
+
+    const chartHtml = `
+<div class="wind-chart-wrap">
+  <canvas id="windChartCanvas"></canvas>
+  <div class="wind-chart-legend">
+    <span><span class="legend-dot legend-speed"></span> Velocità</span>
+    <span><span class="legend-dot legend-gust"></span> Raffica</span>
+    <span>➤ Direzione</span>
+  </div>
+  <p class="wind-chart-caption">Ultime ${rows.length} rilevazioni (Misericordia). Ordine delle colonne vento non ancora verificato sul sito ufficiale: se direzione/velocità/raffica sembrano incoerenti con le condizioni reali, segnalalo.</p>
+</div>
+`;
+
+    showModal("Vento &middot; Misericordia", summaryHtml + chartHtml);
+
+    // Il canvas va disegnato DOPO che showModal ha inserito l'HTML nel
+    // DOM (l'elemento non esiste prima di quel momento).
+    const canvas = document.getElementById("windChartCanvas");
+    if (canvas) {
+      drawWindChart(canvas, rows);
+    }
+
+  } catch (err) {
+
+    console.error(err);
+    showModal("Vento &middot; Misericordia", "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>");
+  }
+}
+
 function setupInteractions() {
 
   document.getElementById("mainTempLink").addEventListener("click", () => {
@@ -708,6 +1160,10 @@ function setupInteractions() {
     openStationModal("Punta della Dogana (Punta Salute)", PUNTA_SALUTE_URL, PUNTA_SALUTE_LABELS);
   });
 
+  document.getElementById("subLidoMeteo").addEventListener("click", openLidoMeteoModal);
+
+  document.getElementById("windLine").addEventListener("click", openWindChartModal);
+
   document.getElementById("modalClose").addEventListener("click", hideModal);
 
   document.getElementById("modalOverlay").addEventListener("click", (e) => {
@@ -723,11 +1179,16 @@ async function loadAll() {
 
     // Tutte le stazioni vengono interrogate in parallelo invece che in
     // sequenza, per velocizzare il caricamento della pagina.
-    const [cavalli, sanGiorgio, cavanis, puntaSalute] = await Promise.all([
+    // lidoMeteo e misericordiaWind non lanciano mai eccezioni (vedi
+    // commenti sulle rispettive funzioni): un problema con una di
+    // queste due fonti non puo' bloccare le altre card.
+    const [cavalli, sanGiorgio, cavanis, puntaSalute, lidoMeteo, misericordiaWind] = await Promise.all([
       loadPalazzoCavalli(),
       loadSanGiorgio(),
       loadCavanis(),
-      loadTide()
+      loadTide(),
+      loadLidoMeteo(),
+      loadMisericordiaWind()
     ]);
 
     // --- Card 1: temperatura, Cavanis come stazione principale ---
@@ -745,6 +1206,18 @@ async function loadAll() {
     document.getElementById("subSanGiorgio").innerHTML =
       "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
       " °C (" + formatTime(sanGiorgio.timestamp) + ")";
+
+    // Lido Meteo (RMLV/ISPRA): puo' non essere disponibile (dominio
+    // offline, CORS, stazione ferma) senza che questo blocchi il resto
+    // della card. L'ora e' solare (UTC+1) come le altre fonti, ma il
+    // formato del timestamp e' diverso (DD/MM/YYYY) quindi usa il suo
+    // formattatore dedicato.
+    document.getElementById("subLidoMeteo").innerHTML =
+      lidoMeteo.available && lidoMeteo.temperature != null
+        ? "Lido Meteo: " + lidoMeteo.temperature.toFixed(1) +
+          " °C (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
+          (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
+        : "Lido Meteo: n.d.";
 
     // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
 
@@ -792,9 +1265,20 @@ async function loadAll() {
     document.getElementById("humidityStation").innerHTML =
       "Osservatorio Cavanis &middot; 🕐 " + formatTime(cavanis.timestamp);
 
+    const lidoMeteoHumidityRow =
+      lidoMeteo.available && lidoMeteo.humidity != null
+        ? `<div class="sub-station">Lido Meteo: ${lidoMeteo.humidity.toFixed(0)} % (${formatTimeIsprambiente(lidoMeteo.timestamp)})` +
+          (lidoMeteo.temperature != null
+            ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(lidoMeteo.temperature, lidoMeteo.humidity).toFixed(1)} °C</span>`
+            : "") +
+          (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "") +
+          `</div>`
+        : `<div class="sub-station">Lido Meteo: n.d.</div>`;
+
     document.getElementById("humidityDetails").innerHTML = `
 <div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
 <div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
+${lidoMeteoHumidityRow}
 `;
 
     // --- Card 3: mare ---
@@ -810,18 +1294,21 @@ async function loadAll() {
     document.getElementById("tideInfo").innerHTML =
       formatTime(puntaSalute.timestamp) + " &middot; " + puntaSalute.source;
 
-    // --- Card 4: vento, pioggia, pressione ---
+    // --- Card 4: vento (Misericordia), pioggia, pressione ---
 
-    // cavanis.windSpeed arriva dall'API ARPA in m/s (confermato dal
-    // campo "unitnm":"m/s" nella risposta JSON grezza): va convertito
-    // in km/h per la visualizzazione.
+    // Vento preso da Misericordia invece che da Cavanis (ARPA): piu'
+    // vicina a casa dell'utente. La velocita' e' inferita in m/s per
+    // analogia con le altre stazioni della stessa rete CPSM (colonna
+    // non ancora verificata, vedi commento su MISERICORDIA_LABELS).
     document.getElementById("wind").innerHTML =
-      (cavanis.windDir != null && !isNaN(cavanis.windDir)
-        ? windDirection(cavanis.windDir) + " "
-        : "") +
-      (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed)
-        ? Math.round(cavanis.windSpeed * 3.6) + " km/h"
-        : "n.d.");
+      misericordiaWind.available
+        ? (misericordiaWind.windDir != null && !isNaN(misericordiaWind.windDir)
+            ? windDirection(misericordiaWind.windDir) + " "
+            : "") +
+          (misericordiaWind.windSpeed != null && !isNaN(misericordiaWind.windSpeed)
+            ? Math.round(misericordiaWind.windSpeed * 3.6) + " km/h"
+            : "n.d.")
+        : "n.d.";
 
     const rainHourText =
       cavalli.rainLastHour != null && !isNaN(cavalli.rainLastHour)

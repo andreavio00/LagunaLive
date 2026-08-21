@@ -22,7 +22,6 @@
 <h1>🌊 LagunaLive</h1>
 
 <div id="status">Caricamento...</div>
-<div id="forceUpdateLink" class="force-update-link">🔄 Forza aggiornamento app</div>
 
 <!-- CARD 1: Temperatura -->
 <div class="card">
@@ -36,6 +35,7 @@
     <div class="sub-stations">
         <div class="sub-station clickable" id="subCavalli">Palazzo Cavalli: -- (--)</div>
         <div class="sub-station clickable" id="subSanGiorgio">San Giorgio: -- (--)</div>
+        <div class="sub-station clickable" id="subLidoMeteo">Lido Meteo: -- (--)</div>
     </div>
 </div>
 
@@ -79,7 +79,7 @@
 
 <!-- CARD 4: Vento, pioggia, pressione -->
 <div class="card">
-    <div class="metric-line">
+    <div class="metric-line clickable" id="windLine">
         <span class="metric-name">💨 Vento</span>
         <span class="metric-data" id="wind">--</span>
     </div>
@@ -102,6 +102,8 @@
         Caricamento...
     </div>
 </div>
+
+<div id="forceUpdateLink" class="force-update-link">🔄 Forza aggiornamento app</div>
 
 <!-- Modale scheda stazione -->
 <div id="modalOverlay" class="modal-overlay">
