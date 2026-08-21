@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.25";
+const APP_VERSION = "v2.26";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -613,50 +613,52 @@ function extractLidoMeteoFromText(text) {
 // problema con questa singola fonte non puo' mai bloccare il
 // caricamento delle altre card.
 //
-// Prova prima il fetch diretto; se va in errore (molto probabile per
-// CORS, essendo un dominio governativo senza header
-// Access-Control-Allow-Origin: confermato con l'utente il 21/08, la
-// card mostrava "n.d." nonostante il file esista e sia pubblico),
-// ripiega sullo stesso proxy https://r.jina.ai/ gia' usato per le
-// pagine CPSM.
+// Prova, in ordine:
+// 1) fetch diretto (confermato con l'utente il 21/08: fallisce,
+//    quasi certamente per CORS, essendo un dominio governativo senza
+//    header Access-Control-Allow-Origin);
+// 2) proxy AllOrigins (https://api.allorigins.win/raw?url=...): a
+//    differenza di r.jina.ai, che applica un filtro di "leggibilita'"
+//    pensato per articoli e puo' scartare un XML puro come se non
+//    contenesse testo utile, AllOrigins restituisce i byte grezzi
+//    della risorsa senza alcuna elaborazione, adatto a file dati come
+//    questo;
+// 3) r.jina.ai come ultimo tentativo, tenuto per compatibilita' anche
+//    se meno adatto a questo tipo di contenuto.
 async function loadLidoMeteo() {
 
-  let text = null;
+  const sources = [
+    ISPRAMBIENTE_DATI_URL,
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL),
+    "https://r.jina.ai/" + ISPRAMBIENTE_DATI_URL
+  ];
 
-  try {
-
-    const response = await fetch(ISPRAMBIENTE_DATI_URL);
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    text = await response.text();
-
-  } catch (directErr) {
-
-    console.warn("Fetch diretto Dati2.xml fallito (probabile CORS), provo il proxy:", directErr);
+  for (const url of sources) {
 
     try {
 
-      const proxyResponse = await fetch("https://r.jina.ai/" + ISPRAMBIENTE_DATI_URL);
-      text = await proxyResponse.text();
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("HTTP " + response.status);
 
-    } catch (proxyErr) {
+      const text = await response.text();
+      const data = extractLidoMeteoFromText(text);
 
-      console.warn("Anche il proxy per Dati2.xml e' fallito:", proxyErr);
-      return { available: false };
+      if (data) {
+        return {
+          available: true,
+          ...data,
+          stale: data.timestamp != null && minutesSinceIsprambiente(data.timestamp) > LIDO_METEO_STALE_MINUTES
+        };
+      }
+
+      console.warn("Lido Meteo: nessun dato riconoscibile da", url);
+
+    } catch (err) {
+      console.warn("Lido Meteo: fonte fallita (" + url + "):", err);
     }
   }
 
-  const data = extractLidoMeteoFromText(text);
-
-  if (!data) {
-    console.warn("Stazione Lido Meteo non trovata nel testo ricevuto (diretto o proxy)");
-    return { available: false };
-  }
-
-  return {
-    available: true,
-    ...data,
-    stale: data.timestamp != null && minutesSinceIsprambiente(data.timestamp) > LIDO_METEO_STALE_MINUTES
-  };
+  return { available: false };
 }
 
 async function loadPuntaSalute() {
