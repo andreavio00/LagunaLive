@@ -544,100 +544,119 @@ async function loadCavanis() {
   };
 }
 
+// Estrae i dati della stazione "Lido Meteo" da un testo che contiene
+// (anche solo in parte, anche con roba non-XML attorno) il blocco
+// <marker id="115" ...>...</marker> del file Dati2.xml. Usa
+// espressioni regolari invece di DOMParser di proposito: cosi' la
+// stessa funzione funziona sia sul file XML diretto sia su una
+// versione passata da un proxy tipo r.jina.ai, che a volte avvolge il
+// contenuto in testo/markdown aggiuntivo e romperebbe un parsing XML
+// rigido. Restituisce null se il blocco marker non viene trovato
+// (dominio offline, proxy che ha restituito una pagina di errore,
+// ecc.), senza mai lanciare eccezioni: chi chiama decide cosa fare.
+function extractLidoMeteoFromText(text) {
+
+  const markerRegex = new RegExp(
+    '<marker[^>]*id="' + LIDO_METEO_MARKER_ID + '"[^>]*>([\\s\\S]*?)<\\/marker>'
+  );
+
+  const markerMatch = text.match(markerRegex);
+  if (!markerMatch) return null;
+
+  const markerContent = markerMatch[1];
+
+  const instrumentRegex = /<instrument[^>]*type="([^"]*)"[^>]*>([\s\S]*?)<\/instrument>/g;
+
+  let temperature = null;
+  let humidity = null;
+  let windDir = null;
+  let windSpeed = null;
+  let pressure = null;
+  let rain = null;
+  let timestamp = null;
+
+  let m;
+  while ((m = instrumentRegex.exec(markerContent)) !== null) {
+
+    const type = m[1];
+    const instrBlock = m[2];
+
+    const valueMatch = instrBlock.match(/<value[^>]*datetime="([^"]*)"[^>]*>\s*([^<]*?)\s*<\/value>/);
+    if (!valueMatch) continue;
+
+    const ts = valueMatch[1];
+    const value = parseFloat(valueMatch[2].trim());
+
+    // Tutti gli strumenti di questa stazione condividono lo stesso
+    // datetime (rilevazione istantanea unica per ciclo): ne basta uno
+    // qualsiasi per l'avviso di aggiornamento.
+    if (timestamp == null) timestamp = ts;
+
+    if (type === "Temperatura") temperature = value;
+    else if (type === "Umid") humidity = value;
+    else if (type === "Vento dir.") windDir = value;
+    else if (type === "Vento vel.") windSpeed = value;
+    else if (type === "Press") pressure = value;
+    else if (type === "Pioggia") rain = value;
+  }
+
+  if (temperature == null && humidity == null) return null;
+
+  return { temperature, humidity, windDir, windSpeed, pressure, rain, timestamp };
+}
+
 // Legge temperatura e umidita' della stazione "Lido Meteo" (RMLV,
-// ISPRA) dal file Dati2.xml. A differenza delle altre loadXxx() di
-// questo file, questa NON lancia mai un'eccezione verso l'esterno: se
-// fallisce (dominio offline, CORS bloccato dal browser, XML non
-// trovato, stazione assente) restituisce semplicemente
-// { available: false }, cosi' un problema con questa singola fonte non
-// puo' mai bloccare il caricamento delle altre card. Non e' ancora
-// stato verificato se il dominio isprambiente.it espone gli header
-// CORS necessari per un fetch diretto dal browser: se in pratica
-// risulta bloccato, la soluzione e' la stessa gia' in uso per le
-// pagine CPSM (proxy https://r.jina.ai/ davanti all'URL) o uno
-// scraper GitHub Actions come per meteo-fassa.
+// ISPRA). A differenza delle altre loadXxx() di questo file, questa
+// NON lancia mai un'eccezione verso l'esterno: se fallisce (dominio
+// offline, CORS bloccato dal browser, XML non trovato, stazione
+// assente) restituisce semplicemente { available: false }, cosi' un
+// problema con questa singola fonte non puo' mai bloccare il
+// caricamento delle altre card.
+//
+// Prova prima il fetch diretto; se va in errore (molto probabile per
+// CORS, essendo un dominio governativo senza header
+// Access-Control-Allow-Origin: confermato con l'utente il 21/08, la
+// card mostrava "n.d." nonostante il file esista e sia pubblico),
+// ripiega sullo stesso proxy https://r.jina.ai/ gia' usato per le
+// pagine CPSM.
 async function loadLidoMeteo() {
+
+  let text = null;
 
   try {
 
     const response = await fetch(ISPRAMBIENTE_DATI_URL);
-    const text = await response.text();
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    text = await response.text();
 
-    const xml = new DOMParser().parseFromString(text, "text/xml");
+  } catch (directErr) {
 
-    if (xml.querySelector("parsererror")) {
-      throw new Error("XML di Dati2.xml non valido");
+    console.warn("Fetch diretto Dati2.xml fallito (probabile CORS), provo il proxy:", directErr);
+
+    try {
+
+      const proxyResponse = await fetch("https://r.jina.ai/" + ISPRAMBIENTE_DATI_URL);
+      text = await proxyResponse.text();
+
+    } catch (proxyErr) {
+
+      console.warn("Anche il proxy per Dati2.xml e' fallito:", proxyErr);
+      return { available: false };
     }
+  }
 
-    const markers = xml.getElementsByTagName("marker");
+  const data = extractLidoMeteoFromText(text);
 
-    let marker = null;
-    for (let i = 0; i < markers.length; i++) {
-      if (markers[i].getAttribute("id") === LIDO_METEO_MARKER_ID) {
-        marker = markers[i];
-        break;
-      }
-    }
-
-    if (!marker) {
-      throw new Error("Stazione Lido Meteo (id " + LIDO_METEO_MARKER_ID + ") non trovata in Dati2.xml");
-    }
-
-    const instruments = marker.getElementsByTagName("instrument");
-
-    let temperature = null;
-    let humidity = null;
-    let windDir = null;
-    let windSpeed = null;
-    let pressure = null;
-    let rain = null;
-    let timestamp = null;
-
-    for (let i = 0; i < instruments.length; i++) {
-
-      const instr = instruments[i];
-      const valueEl = instr.getElementsByTagName("value")[0];
-
-      if (!valueEl) continue;
-
-      const type = instr.getAttribute("type");
-      const value = parseFloat(valueEl.textContent.trim());
-      const ts = valueEl.getAttribute("datetime");
-
-      // Tutti gli strumenti di questa stazione condividono lo stesso
-      // datetime (rilevazione istantanea unica per ciclo): ne basta
-      // uno qualsiasi per l'avviso di aggiornamento.
-      if (timestamp == null) timestamp = ts;
-
-      if (type === "Temperatura") temperature = value;
-      else if (type === "Umid") humidity = value;
-      else if (type === "Vento dir.") windDir = value;
-      else if (type === "Vento vel.") windSpeed = value;
-      else if (type === "Press") pressure = value;
-      else if (type === "Pioggia") rain = value;
-    }
-
-    if (temperature == null && humidity == null) {
-      throw new Error("Nessun dato di temperatura/umidita' per Lido Meteo in Dati2.xml");
-    }
-
-    return {
-      available: true,
-      temperature,
-      humidity,
-      windDir,
-      windSpeed,
-      pressure,
-      rain,
-      timestamp,
-      stale: timestamp != null && minutesSinceIsprambiente(timestamp) > LIDO_METEO_STALE_MINUTES
-    };
-
-  } catch (err) {
-
-    console.warn("Lido Meteo non disponibile:", err);
+  if (!data) {
+    console.warn("Stazione Lido Meteo non trovata nel testo ricevuto (diretto o proxy)");
     return { available: false };
   }
+
+  return {
+    available: true,
+    ...data,
+    stale: data.timestamp != null && minutesSinceIsprambiente(data.timestamp) > LIDO_METEO_STALE_MINUTES
+  };
 }
 
 async function loadPuntaSalute() {
