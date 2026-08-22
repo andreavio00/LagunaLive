@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.27";
+const APP_VERSION = "v2.28";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -605,15 +605,34 @@ function extractLidoMeteoFromText(text) {
   return { temperature, humidity, windDir, windSpeed, pressure, rain, timestamp };
 }
 
+// Timeout (ms) per ogni singolo tentativo di fetch di Lido Meteo.
+// Senza questo, un fetch che resta "appeso" (nessuna risposta, nessun
+// errore) blocca l'intera funzione a tempo indeterminato invece di
+// passare rapidamente alla fonte successiva - bug reale riscontrato
+// il 22/08/2026: l'intera app restava in caricamento per minuti.
+const LIDO_METEO_FETCH_TIMEOUT_MS = 6000;
+
+function fetchWithTimeout(url, timeoutMs) {
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 // Legge temperatura e umidita' della stazione "Lido Meteo" (RMLV,
 // ISPRA). A differenza delle altre loadXxx() di questo file, questa
 // NON lancia mai un'eccezione verso l'esterno: se fallisce (dominio
 // offline, CORS bloccato dal browser, XML non trovato, stazione
 // assente) restituisce semplicemente { available: false }, cosi' un
 // problema con questa singola fonte non puo' mai bloccare il
-// caricamento delle altre card.
+// caricamento delle altre card. Inoltre non viene nemmeno incluso nel
+// Promise.all principale di loadAll() (vedi li'): anche se per
+// qualsiasi motivo finisse per bloccarsi comunque, il resto dell'app
+// deve restare utilizzabile.
 //
-// Prova, in ordine (verificato con l'utente il 21/08/2026):
+// Prova, in ordine (verificato con l'utente il 21/08/2026), ciascuno
+// con un timeout di pochi secondi:
 // 1) fetch diretto: fallisce, quasi certamente per CORS, essendo un
 //    dominio governativo senza header Access-Control-Allow-Origin;
 // 2) proxy codetabs.com (gia' usato con successo in meteo-fassa per
@@ -641,7 +660,7 @@ async function loadLidoMeteo() {
 
     try {
 
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, LIDO_METEO_FETCH_TIMEOUT_MS);
       if (!response.ok) throw new Error("HTTP " + response.status);
 
       const text = await response.text();
@@ -1196,6 +1215,33 @@ function setupInteractions() {
   });
 }
 
+// Aggiorna le due righe di Lido Meteo (temperatura e umidita') in modo
+// indipendente dal resto della pagina: chiamata sia dal flusso
+// normale in loadAll() sia dal catch di riserva, cosi' la card mostra
+// sempre uno stato definito (mai bloccata su "caricamento...").
+function updateLidoMeteoUI(lidoMeteo) {
+
+  // L'ora e' solare (UTC+1) come le altre fonti, ma il formato del
+  // timestamp e' diverso (DD/MM/YYYY) quindi usa il suo formattatore
+  // dedicato.
+  document.getElementById("subLidoMeteo").innerHTML =
+    lidoMeteo.available && lidoMeteo.temperature != null
+      ? "Lido Meteo: " + lidoMeteo.temperature.toFixed(1) +
+        " °C (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
+        (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
+      : "Lido Meteo: n.d.";
+
+  document.getElementById("humidityLidoMeteo").innerHTML =
+    lidoMeteo.available && lidoMeteo.humidity != null
+      ? "Lido Meteo: " + lidoMeteo.humidity.toFixed(0) +
+        " % (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
+        (lidoMeteo.temperature != null
+          ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(lidoMeteo.temperature, lidoMeteo.humidity).toFixed(1)} °C</span>`
+          : "") +
+        (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
+      : "Lido Meteo: n.d.";
+}
+
 async function loadAll() {
 
   document.getElementById("status").innerHTML = "Caricamento...";
@@ -1204,15 +1250,31 @@ async function loadAll() {
 
     // Tutte le stazioni vengono interrogate in parallelo invece che in
     // sequenza, per velocizzare il caricamento della pagina.
-    // lidoMeteo e misericordiaWind non lanciano mai eccezioni (vedi
-    // commenti sulle rispettive funzioni): un problema con una di
-    // queste due fonti non puo' bloccare le altre card.
-    const [cavalli, sanGiorgio, cavanis, puntaSalute, lidoMeteo, misericordiaWind] = await Promise.all([
+    // misericordiaWind non lancia mai eccezioni (vedi commento sulla
+    // funzione): un problema con questa fonte non puo' bloccare le
+    // altre card.
+    //
+    // Lido Meteo NON e' incluso qui di proposito: dipende da proxy
+    // esterni che si sono gia' dimostrati inaffidabili in pratica
+    // (vedi commenti su loadLidoMeteo). Anche con il timeout interno a
+    // quella funzione, tenerlo fuori dal Promise.all principale
+    // garantisce che il resto dell'app si carichi sempre a prescindere
+    // da cosa succede con quella singola fonte: viene avviato subito
+    // sotto, in parallelo ma non atteso qui, e aggiorna le sue due
+    // righe (temperatura e umidita') in modo indipendente quando
+    // arriva un risultato.
+    loadLidoMeteo()
+      .then(updateLidoMeteoUI)
+      .catch(err => {
+        console.warn("Lido Meteo: errore imprevisto, mostro n.d.", err);
+        updateLidoMeteoUI({ available: false });
+      });
+
+    const [cavalli, sanGiorgio, cavanis, puntaSalute, misericordiaWind] = await Promise.all([
       loadPalazzoCavalli(),
       loadSanGiorgio(),
       loadCavanis(),
       loadTide(),
-      loadLidoMeteo(),
       loadMisericordiaWind()
     ]);
 
@@ -1231,18 +1293,6 @@ async function loadAll() {
     document.getElementById("subSanGiorgio").innerHTML =
       "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
       " °C (" + formatTime(sanGiorgio.timestamp) + ")";
-
-    // Lido Meteo (RMLV/ISPRA): puo' non essere disponibile (dominio
-    // offline, CORS, stazione ferma) senza che questo blocchi il resto
-    // della card. L'ora e' solare (UTC+1) come le altre fonti, ma il
-    // formato del timestamp e' diverso (DD/MM/YYYY) quindi usa il suo
-    // formattatore dedicato.
-    document.getElementById("subLidoMeteo").innerHTML =
-      lidoMeteo.available && lidoMeteo.temperature != null
-        ? "Lido Meteo: " + lidoMeteo.temperature.toFixed(1) +
-          " °C (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
-          (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
-        : "Lido Meteo: n.d.";
 
     // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
 
@@ -1290,21 +1340,14 @@ async function loadAll() {
     document.getElementById("humidityStation").innerHTML =
       "Osservatorio Cavanis &middot; 🕐 " + formatTime(cavanis.timestamp);
 
-    const lidoMeteoHumidityRow =
-      lidoMeteo.available && lidoMeteo.humidity != null
-        ? `<div class="sub-station">Lido Meteo: ${lidoMeteo.humidity.toFixed(0)} % (${formatTimeIsprambiente(lidoMeteo.timestamp)})` +
-          (lidoMeteo.temperature != null
-            ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(lidoMeteo.temperature, lidoMeteo.humidity).toFixed(1)} °C</span>`
-            : "") +
-          (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "") +
-          `</div>`
-        : `<div class="sub-station">Lido Meteo: n.d.</div>`;
+    document.getElementById("humidityCavalli").innerHTML =
+      `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`;
 
-    document.getElementById("humidityDetails").innerHTML = `
-<div class="sub-station">Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span></div>
-<div class="sub-station">San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span></div>
-${lidoMeteoHumidityRow}
-`;
+    document.getElementById("humiditySanGiorgio").innerHTML =
+      `San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span>`;
+    // humidityLidoMeteo viene aggiornato da updateLidoMeteoUI(),
+    // indipendentemente da questo blocco (vedi commento piu' sopra sul
+    // perche' Lido Meteo e' escluso dal Promise.all principale).
 
     // --- Card 3: mare ---
 
