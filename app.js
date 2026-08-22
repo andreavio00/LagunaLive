@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.32";
+const APP_VERSION = "v2.33";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -390,26 +390,15 @@ function apparentTemperatureSun(tempC, humidity, radiationWm2, radiationTimestam
 // colonne e' stato verificato, es. Palazzo Cavalli). Se false, le
 // colonne senza etichetta verificata vengono nascoste invece di
 // mostrare un dato senza indicazione di cosa sia.
-function parseLastRowLabeled(text, labels, showUnknown = true) {
+function parseLastRowLabeled(html, labels, showUnknown = true) {
 
-  const dataLines = text
-    .split("\n")
-    .filter(line => /^\|\s*\d{4}-\d{2}-\d{2}/.test(line));
+  const tableRows = parseHtmlTableRows(html);
 
-  if (dataLines.length === 0) {
+  if (tableRows.length === 0) {
     return null;
   }
 
-  const lastRow = dataLines[dataLines.length - 1];
-
-  const cells = lastRow
-    .split("|")
-    .map(c => c.trim())
-    .filter((c, idx, arr) => {
-      if (idx === 0 && c === "") return false;
-      if (idx === arr.length - 1 && c === "") return false;
-      return true;
-    });
+  const cells = tableRows[tableRows.length - 1];
 
   const rows = [];
 
@@ -440,28 +429,58 @@ function parseLastRowLabeled(text, labels, showUnknown = true) {
   return rows;
 }
 
+// Estrae le righe di una tabella HTML (<tr><td>...</td>...</tr>) come
+// array di array di stringhe, una per riga, saltando automaticamente
+// le righe di intestazione (che usano <th>, non <td>). Sostituisce il
+// vecchio parsing "a barre verticali" (split("|")) che funzionava solo
+// quando le pagine CPSM passavano attraverso r.jina.ai: quel servizio
+// convertiva la tabella HTML in una tabella markdown con quel formato.
+// Dal 22/08/2026 le pagine CPSM passano invece dal Worker Cloudflare
+// dell'utente, che restituisce l'HTML originale della pagina (vedi
+// PROXY_WORKER_URL) - da qui la necessita' di leggere <td> veri
+// invece di celle separate da "|".
+function parseHtmlTableRows(html) {
+
+  const rows = [];
+  const rowRegex = /<tr>([\s\S]*?)<\/tr>/g;
+
+  let rowMatch;
+  while ((rowMatch = rowRegex.exec(html)) !== null) {
+
+    const rowContent = rowMatch[1];
+
+    // Le righe di intestazione usano <th>, non <td>: le saltiamo senza
+    // bisogno di riconoscerle esplicitamente, semplicemente perche'
+    // non contengono nessuna cella <td>.
+    if (!rowContent.includes("<td")) continue;
+
+    const cells = [];
+    const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
+
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(rowContent)) !== null) {
+      cells.push(cellMatch[1].trim());
+    }
+
+    rows.push(cells);
+  }
+
+  return rows;
+}
+
 async function loadPalazzoCavalli() {
 
   const response = await fetch(PALAZZO_CAVALLI_URL);
-  const text = await response.text();
+  const html = await response.text();
 
-  const rows = text
-    .split("\n")
-    .filter(line => line.startsWith("| 2026-"));
-
-  const parsedRows = rows.map(line => {
-
-    const cols = line.split("|").map(x => x.trim());
-
-    return {
-      timestamp: cols[1],
-      pressure: parseFloat(cols[2]),
-      temperature: parseFloat(cols[3]),
-      humidity: parseFloat(cols[4]),
-      radiation: parseFloat(cols[5]),
-      rain: parseFloat(cols[6])
-    };
-  });
+  const parsedRows = parseHtmlTableRows(html).map(cols => ({
+    timestamp: cols[0],
+    pressure: parseFloat(cols[1]),
+    temperature: parseFloat(cols[2]),
+    humidity: parseFloat(cols[3]),
+    radiation: parseFloat(cols[4]),
+    rain: parseFloat(cols[5])
+  }));
 
   const last = parsedRows[parsedRows.length - 1];
 
@@ -493,25 +512,18 @@ async function loadPalazzoCavalli() {
 async function loadSanGiorgio() {
 
   const response = await fetch(SAN_GIORGIO_URL);
-  const text = await response.text();
+  const html = await response.text();
 
-  const rows = text
-    .split("\n")
-    .filter(line => line.startsWith("| 2026-"));
-
-  const lastRow = rows[rows.length - 1];
-
-  const cols = lastRow
-    .split("|")
-    .map(x => x.trim());
+  const tableRows = parseHtmlTableRows(html);
+  const cols = tableRows[tableRows.length - 1];
 
   return {
-    timestamp: cols[1],
-    windDir: parseFloat(cols[2]),
-    windSpeed: parseFloat(cols[3]),
-    windGust: parseFloat(cols[4]),
-    temperature: parseFloat(cols[5]),
-    humidity: parseFloat(cols[6])
+    timestamp: cols[0],
+    windDir: parseFloat(cols[1]),
+    windSpeed: parseFloat(cols[2]),
+    windGust: parseFloat(cols[3]),
+    temperature: parseFloat(cols[4]),
+    humidity: parseFloat(cols[5])
   };
 }
 
@@ -714,25 +726,14 @@ async function loadLidoMeteo() {
 async function loadPuntaSalute() {
 
   const response = await fetch(PUNTA_SALUTE_URL);
-  const text = await response.text();
+  const html = await response.text();
 
-  const rows = text
-    .split("\n")
-    .filter(line => line.startsWith("| 2026-"));
+  const tableRows = parseHtmlTableRows(html);
+  const cols = tableRows[tableRows.length - 1];
+  const prevCols = tableRows[tableRows.length - 3];
 
-  const lastRow = rows[rows.length - 1];
-  const previousRow = rows[rows.length - 3];
-
-  const cols = lastRow
-    .split("|")
-    .map(x => x.trim());
-
-  const prevCols = previousRow
-    .split("|")
-    .map(x => x.trim());
-
-  const tide = Math.round(parseFloat(cols[2]) * 100);
-  const prevTide = Math.round(parseFloat(prevCols[2]) * 100);
+  const tide = Math.round(parseFloat(cols[1]) * 100);
+  const prevTide = Math.round(parseFloat(prevCols[1]) * 100);
 
   let trend = "→";
 
@@ -740,10 +741,10 @@ async function loadPuntaSalute() {
   if (tide < prevTide) trend = "↓";
 
   return {
-    timestamp: cols[1],
+    timestamp: cols[0],
     tide,
     trend,
-    waterTemp: parseFloat(cols[3])
+    waterTemp: parseFloat(cols[2])
   };
 }
 
@@ -757,24 +758,16 @@ async function loadPuntaSalute() {
 async function loadMisericordiaTable() {
 
   const response = await fetch(MISERICORDIA_URL);
-  const text = await response.text();
+  const html = await response.text();
 
-  const rows = text
-    .split("\n")
-    .filter(line => /^\|\s*\d{4}-\d{2}-\d{2}/.test(line))
-    .map(line => {
-
-      const cols = line.split("|").map(x => x.trim());
-
-      return {
-        timestamp: cols[1],
-        tide: parseFloat(cols[2]),
-        windDir: parseFloat(cols[3]),
-        windSpeed: parseFloat(cols[4]),
-        windGust: parseFloat(cols[5]),
-        waveHeight: parseFloat(cols[6])
-      };
-    });
+  const rows = parseHtmlTableRows(html).map(cols => ({
+    timestamp: cols[0],
+    tide: parseFloat(cols[1]),
+    windDir: parseFloat(cols[2]),
+    windSpeed: parseFloat(cols[3]),
+    windGust: parseFloat(cols[4]),
+    waveHeight: parseFloat(cols[5])
+  }));
 
   if (rows.length === 0) {
     throw new Error("Nessuna riga dati trovata per Misericordia");
