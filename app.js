@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.26";
+const APP_VERSION = "v2.27";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -613,24 +613,28 @@ function extractLidoMeteoFromText(text) {
 // problema con questa singola fonte non puo' mai bloccare il
 // caricamento delle altre card.
 //
-// Prova, in ordine:
-// 1) fetch diretto (confermato con l'utente il 21/08: fallisce,
-//    quasi certamente per CORS, essendo un dominio governativo senza
-//    header Access-Control-Allow-Origin);
-// 2) proxy AllOrigins (https://api.allorigins.win/raw?url=...): a
-//    differenza di r.jina.ai, che applica un filtro di "leggibilita'"
-//    pensato per articoli e puo' scartare un XML puro come se non
-//    contenesse testo utile, AllOrigins restituisce i byte grezzi
-//    della risorsa senza alcuna elaborazione, adatto a file dati come
-//    questo;
-// 3) r.jina.ai come ultimo tentativo, tenuto per compatibilita' anche
-//    se meno adatto a questo tipo di contenuto.
+// Prova, in ordine (verificato con l'utente il 21/08/2026):
+// 1) fetch diretto: fallisce, quasi certamente per CORS, essendo un
+//    dominio governativo senza header Access-Control-Allow-Origin;
+// 2) proxy codetabs.com (gia' usato con successo in meteo-fassa per
+//    lo stesso tipo di problema): a differenza di r.jina.ai fa da
+//    semplice "passa-carte" senza elaborare il contenuto, adatto a un
+//    file XML puro;
+// 3) proxy AllOrigins come ultima riserva: risultato instabile in
+//    pratica (errore 500 lato loro al momento del test), ma il
+//    servizio e' notoriamente intermittente quindi vale la pena
+//    ritentare piuttosto che scartarlo del tutto.
+//
+// r.jina.ai e' stato escluso: applica un controllo di sicurezza
+// (pagina interstiziale) che un fetch() da codice non puo' superare
+// (non essendo un browser reale), e comunque il suo filtro di
+// "leggibilita'" pensato per articoli mangiava la struttura dell'XML.
 async function loadLidoMeteo() {
 
   const sources = [
     ISPRAMBIENTE_DATI_URL,
-    "https://api.allorigins.win/raw?url=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL),
-    "https://r.jina.ai/" + ISPRAMBIENTE_DATI_URL
+    "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL),
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL)
   ];
 
   for (const url of sources) {
