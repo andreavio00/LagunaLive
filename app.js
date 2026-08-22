@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.28";
+const APP_VERSION = "v2.29";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -21,6 +21,14 @@ const MISERICORDIA_URL =
 
 const CAVANIS_API_URL =
   "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
+
+// Worker Cloudflare personale (dell'utente) che scarica Dati2.xml lato
+// server e lo restituisce con l'header CORS corretto: risolve il
+// problema alla radice invece di dipendere da proxy pubblici gratuiti,
+// rivelatisi entrambi inaffidabili in pratica (21-22/08/2026: codetabs
+// offline con errore Cloudflare 522, AllOrigins con errore 500).
+// Vedi commento su loadLidoMeteo per l'ordine dei tentativi.
+const LIDO_METEO_WORKER_URL = "https://lagunalive-proxy.andrea-vio.workers.dev/";
 
 // File XML "grezzo" dietro la webgis ISPRA (RMLV): contiene tutte le
 // stazioni della rete con l'ultimo dato disponibile per ogni
@@ -622,35 +630,34 @@ function fetchWithTimeout(url, timeoutMs) {
 
 // Legge temperatura e umidita' della stazione "Lido Meteo" (RMLV,
 // ISPRA). A differenza delle altre loadXxx() di questo file, questa
-// NON lancia mai un'eccezione verso l'esterno: se fallisce (dominio
-// offline, CORS bloccato dal browser, XML non trovato, stazione
-// assente) restituisce semplicemente { available: false }, cosi' un
-// problema con questa singola fonte non puo' mai bloccare il
-// caricamento delle altre card. Inoltre non viene nemmeno incluso nel
-// Promise.all principale di loadAll() (vedi li'): anche se per
-// qualsiasi motivo finisse per bloccarsi comunque, il resto dell'app
-// deve restare utilizzabile.
+// NON lancia mai un'eccezione verso l'esterno: se fallisce (Worker
+// giu', XML non trovato, stazione assente) restituisce semplicemente
+// { available: false }, cosi' un problema con questa singola fonte non
+// puo' mai bloccare il caricamento delle altre card. Inoltre non viene
+// nemmeno incluso nel Promise.all principale di loadAll() (vedi li'):
+// anche se per qualsiasi motivo finisse per bloccarsi comunque, il
+// resto dell'app deve restare utilizzabile.
 //
-// Prova, in ordine (verificato con l'utente il 21/08/2026), ciascuno
-// con un timeout di pochi secondi:
-// 1) fetch diretto: fallisce, quasi certamente per CORS, essendo un
-//    dominio governativo senza header Access-Control-Allow-Origin;
-// 2) proxy codetabs.com (gia' usato con successo in meteo-fassa per
-//    lo stesso tipo di problema): a differenza di r.jina.ai fa da
-//    semplice "passa-carte" senza elaborare il contenuto, adatto a un
-//    file XML puro;
-// 3) proxy AllOrigins come ultima riserva: risultato instabile in
-//    pratica (errore 500 lato loro al momento del test), ma il
-//    servizio e' notoriamente intermittente quindi vale la pena
-//    ritentare piuttosto che scartarlo del tutto.
-//
-// r.jina.ai e' stato escluso: applica un controllo di sicurezza
-// (pagina interstiziale) che un fetch() da codice non puo' superare
-// (non essendo un browser reale), e comunque il suo filtro di
-// "leggibilita'" pensato per articoli mangiava la struttura dell'XML.
+// Prova, in ordine, ciascuno con un timeout di pochi secondi:
+// 1) Worker Cloudflare personale dell'utente (LIDO_METEO_WORKER_URL):
+//    scarica il file lato server (nessun problema di CORS) e lo
+//    restituisce con l'header Access-Control-Allow-Origin. Verificato
+//    funzionante il 22/08/2026. Preferito perche' sotto il controllo
+//    diretto dell'utente, a differenza dei proxy pubblici sottostanti
+//    che si sono gia' dimostrati inaffidabili;
+// 2) fetch diretto del file ISPRA: fallisce quasi certamente per CORS
+//    (dominio governativo senza Access-Control-Allow-Origin), tenuto
+//    come tentativo a costo zero nel caso ISPRA cambiasse politica;
+// 3-4) codetabs.com e AllOrigins come ultima riserva: entrambi si sono
+//    gia' dimostrati inaffidabili in pratica (rispettivamente offline
+//    con errore Cloudflare 522, e errore 500 lato loro, il 21-22/08/2026)
+//    ma restano un tentativo a costo quasi zero se il Worker personale
+//    dovesse smettere di funzionare (es. quota mensile Cloudflare
+//    esaurita, molto improbabile per l'uso di una sola persona).
 async function loadLidoMeteo() {
 
   const sources = [
+    LIDO_METEO_WORKER_URL,
     ISPRAMBIENTE_DATI_URL,
     "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL),
     "https://api.allorigins.win/raw?url=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL)
