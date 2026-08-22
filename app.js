@@ -2,33 +2,44 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.31";
+const APP_VERSION = "v2.32";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
 
-const PALAZZO_CAVALLI_URL =
-  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
+// Worker Cloudflare personale dell'utente (generico: accetta qualsiasi
+// URL consentito tramite ?url=, con allowlist di dominio lato Worker
+// per sicurezza). Sostituisce r.jina.ai per le pagine CPSM del Comune
+// di Venezia: r.jina.ai applica un'elaborazione "leggibilita'" pensata
+// per articoli che a volte deforma tabelle/dati grezzi, mentre il
+// Worker fa da semplice passa-carte. Usato inizialmente solo per Lido
+// Meteo (ISPRA) e poi esteso anche alle pagine CPSM il 22/08/2026 dopo
+// aver notato che queste ultime, ancora su r.jina.ai, si caricavano
+// molto piu' lentamente.
+const PROXY_WORKER_URL = "https://lagunalive-proxy.andrea-vio.workers.dev/";
 
-const SAN_GIORGIO_URL =
-  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html";
+function proxyUrl(targetUrl) {
+  return PROXY_WORKER_URL + "?url=" + encodeURIComponent(targetUrl);
+}
 
-const PUNTA_SALUTE_URL =
-  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html";
+const PALAZZO_CAVALLI_URL = proxyUrl(
+  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html"
+);
 
-const MISERICORDIA_URL =
-  "https://r.jina.ai/http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html";
+const SAN_GIORGIO_URL = proxyUrl(
+  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html"
+);
+
+const PUNTA_SALUTE_URL = proxyUrl(
+  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html"
+);
+
+const MISERICORDIA_URL = proxyUrl(
+  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html"
+);
 
 const CAVANIS_API_URL =
   "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
-
-// Worker Cloudflare personale (dell'utente) che scarica Dati2.xml lato
-// server e lo restituisce con l'header CORS corretto: risolve il
-// problema alla radice invece di dipendere da proxy pubblici gratuiti,
-// rivelatisi entrambi inaffidabili in pratica (21-22/08/2026: codetabs
-// offline con errore Cloudflare 522, AllOrigins con errore 500).
-// Vedi commento su loadLidoMeteo per l'ordine dei tentativi.
-const LIDO_METEO_WORKER_URL = "https://lagunalive-proxy.andrea-vio.workers.dev/";
 
 // File XML "grezzo" dietro la webgis ISPRA (RMLV): contiene tutte le
 // stazioni della rete con l'ultimo dato disponibile per ogni
@@ -646,12 +657,13 @@ function fetchWithTimeout(url, timeoutMs) {
 // resto dell'app deve restare utilizzabile.
 //
 // Prova, in ordine, ciascuno con un timeout di pochi secondi:
-// 1) Worker Cloudflare personale dell'utente (LIDO_METEO_WORKER_URL):
-//    scarica il file lato server (nessun problema di CORS) e lo
-//    restituisce con l'header Access-Control-Allow-Origin. Verificato
-//    funzionante il 22/08/2026. Preferito perche' sotto il controllo
-//    diretto dell'utente, a differenza dei proxy pubblici sottostanti
-//    che si sono gia' dimostrati inaffidabili;
+// 1) Worker Cloudflare personale dell'utente (ora generico, vedi
+//    proxyUrl() e PROXY_WORKER_URL): scarica il file lato server
+//    (nessun problema di CORS) e lo restituisce con l'header
+//    Access-Control-Allow-Origin. Verificato funzionante il
+//    22/08/2026. Preferito perche' sotto il controllo diretto
+//    dell'utente, a differenza dei proxy pubblici sottostanti che si
+//    sono gia' dimostrati inaffidabili;
 // 2) fetch diretto del file ISPRA: fallisce quasi certamente per CORS
 //    (dominio governativo senza Access-Control-Allow-Origin), tenuto
 //    come tentativo a costo zero nel caso ISPRA cambiasse politica;
@@ -659,12 +671,13 @@ function fetchWithTimeout(url, timeoutMs) {
 //    gia' dimostrati inaffidabili in pratica (rispettivamente offline
 //    con errore Cloudflare 522, e errore 500 lato loro, il 21-22/08/2026)
 //    ma restano un tentativo a costo quasi zero se il Worker personale
-//    dovesse smettere di funzionare (es. quota mensile Cloudflare
-//    esaurita, molto improbabile per l'uso di una sola persona).
+//    dovesse smettere di funzionare (es. quota giornaliera Cloudflare
+//    esaurita, molto improbabile per l'uso di una sola persona: il
+//    piano gratuito consente 100.000 richieste al giorno).
 async function loadLidoMeteo() {
 
   const sources = [
-    LIDO_METEO_WORKER_URL,
+    proxyUrl(ISPRAMBIENTE_DATI_URL),
     ISPRAMBIENTE_DATI_URL,
     "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL),
     "https://api.allorigins.win/raw?url=" + encodeURIComponent(ISPRAMBIENTE_DATI_URL)
@@ -869,7 +882,7 @@ async function loadStationsConfig() {
       if (station.url) {
         const labels = STATION_LABELS[station.id] || ["Data/Ora"];
         const verified = STATION_LABELS_VERIFIED[station.id] !== false;
-        openStationModal(station.name, "https://r.jina.ai/" + station.url, labels, verified);
+        openStationModal(station.name, proxyUrl(station.url), labels, verified);
       }
     });
 
