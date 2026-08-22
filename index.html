@@ -14,7 +14,18 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-<link rel="stylesheet" href="style.css">
+<!-- ATTENZIONE: il numero "?v=2.34" qui e in app.js va aggiornato
+     insieme a APP_VERSION (in app.js) e CACHE_NAME (in sw.js) ad ogni
+     rilascio. Senza questo numero nell'indirizzo, il browser puo'
+     continuare a servire una copia di style.css dalla propria cache
+     HTTP anche dopo aver cancellato la cache del Service Worker: sono
+     due cache diverse e indipendenti (bug reale riscontrato il
+     22/08/2026, richiedeva la cancellazione manuale della cache di
+     Chrome per vedere gli aggiornamenti). Cambiare il numero rende
+     l'indirizzo del file diverso da quello precedente, obbligando il
+     browser a scaricarlo di nuovo indipendentemente da qualsiasi
+     intestazione di cache del server. -->
+<link rel="stylesheet" href="style.css?v=2.34">
 </head>
 
 <body>
@@ -125,7 +136,9 @@
     </div>
 </div>
 
-<script src="app.js"></script>
+<!-- Stesso numero di versione di style.css qui sopra e di
+     APP_VERSION/CACHE_NAME: vedi commento su style.css per il perche'. -->
+<script src="app.js?v=2.34"></script>
 
 </body>
 </html>

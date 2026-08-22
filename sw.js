@@ -1,14 +1,20 @@
-const CACHE_NAME = "lagunalive-shell-v2.33";
+const CACHE_NAME = "lagunalive-shell-v2.34";
 
 // Solo la "cornice" dell'app (HTML/CSS/JS/icone) viene messa in cache:
 // i dati meteo restano sempre presi dalla rete in tempo reale, cosi'
 // l'app si apre subito anche con connessione lenta o assente, ma non
 // mostra mai dati vecchi spacciandoli per aggiornati.
+//
+// app.js e style.css includono "?v=..." nell'indirizzo (deve
+// corrispondere a quello scritto in index.html): senza, il browser
+// puo' continuare a servire una versione vecchia dalla propria cache
+// HTTP anche dopo che questo Service Worker si e' aggiornato - sono
+// due cache indipendenti (bug reale riscontrato il 22/08/2026).
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./style.css",
-  "./app.js",
+  "./style.css?v=2.34",
+  "./app.js?v=2.34",
   "./manifest.json",
   "./stations.json",
   "./icons/icon-192.png",
@@ -43,9 +49,16 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
+  // Il confronto usa solo il percorso "base" del file (senza "./" e
+  // senza l'eventuale "?v=..."), perche' url.pathname non include mai
+  // la query string: senza questa pulizia, le voci con "?v=..." in
+  // SHELL_FILES non troverebbero mai corrispondenza.
   const isShellFile =
     url.origin === self.location.origin &&
-    SHELL_FILES.some((file) => url.pathname.endsWith(file.replace("./", "")));
+    SHELL_FILES.some((file) => {
+      const basePath = file.replace("./", "").split("?")[0];
+      return url.pathname.endsWith(basePath);
+    });
 
   if (!isShellFile) {
     // Dati meteo e altre richieste esterne: sempre dalla rete.

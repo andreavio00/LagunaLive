@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.33";
+const APP_VERSION = "v2.34";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -1510,7 +1510,13 @@ document.getElementById("forceUpdateLink").addEventListener("click", async () =>
     console.warn("Errore durante la pulizia forzata:", err);
   }
 
-  // Il "true" forza il browser a ignorare qualsiasi copia in cache
-  // anche per il ricaricamento stesso della pagina HTML.
-  window.location.reload(true);
+  // NON si usa location.reload(true): il parametro booleano che un
+  // tempo forzava il bypass della cache e' ormai ignorato dai browser
+  // moderni (bug reale riscontrato il 22/08/2026, serviva cancellare
+  // la cache di Chrome a mano per vedere gli aggiornamenti). Invece,
+  // si naviga verso un indirizzo con un numero casuale in coda: essendo
+  // un indirizzo mai visto prima, il browser non ha alcuna copia in
+  // cache a cui appoggiarsi e deve per forza richiederlo alla rete.
+  window.location.href =
+    window.location.pathname + "?forceupdate=" + Date.now();
 });
