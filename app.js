@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.29";
+const APP_VERSION = "v2.30";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -564,8 +564,15 @@ async function loadCavanis() {
 // ecc.), senza mai lanciare eccezioni: chi chiama decide cosa fare.
 function extractLidoMeteoFromText(text) {
 
+  // \\s* attorno agli "=" perche' fonti diverse formattano l'XML in
+  // modo diverso: il file originale ISPRA usa attributi senza spazi
+  // (id="115"), ma il Worker proxy (che passa il contenuto attraverso
+  // il proprio motore di fetch) lo restituisce con spazi attorno al
+  // segno di uguale (id = "115") - bug reale riscontrato il
+  // 22/08/2026: la regex rigida non trovava piu' la stazione anche se
+  // il Worker rispondeva correttamente.
   const markerRegex = new RegExp(
-    '<marker[^>]*id="' + LIDO_METEO_MARKER_ID + '"[^>]*>([\\s\\S]*?)<\\/marker>'
+    '<marker[^>]*id\\s*=\\s*"' + LIDO_METEO_MARKER_ID + '"[^>]*>([\\s\\S]*?)<\\/marker>'
   );
 
   const markerMatch = text.match(markerRegex);
@@ -573,7 +580,7 @@ function extractLidoMeteoFromText(text) {
 
   const markerContent = markerMatch[1];
 
-  const instrumentRegex = /<instrument[^>]*type="([^"]*)"[^>]*>([\s\S]*?)<\/instrument>/g;
+  const instrumentRegex = /<instrument[^>]*type\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\/instrument>/g;
 
   let temperature = null;
   let humidity = null;
@@ -589,7 +596,7 @@ function extractLidoMeteoFromText(text) {
     const type = m[1];
     const instrBlock = m[2];
 
-    const valueMatch = instrBlock.match(/<value[^>]*datetime="([^"]*)"[^>]*>\s*([^<]*?)\s*<\/value>/);
+    const valueMatch = instrBlock.match(/<value[^>]*datetime\s*=\s*"([^"]*)"[^>]*>\s*([^<]*?)\s*<\/value>/);
     if (!valueMatch) continue;
 
     const ts = valueMatch[1];
