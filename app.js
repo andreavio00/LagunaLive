@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.30";
+const APP_VERSION = "v2.31";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -970,7 +970,7 @@ async function openCavanisModal() {
 // pagina.
 async function openLidoMeteoModal() {
 
-  showModal("Lido Meteo", "<p>Caricamento dati aggiornati...</p>");
+  showModal("Lido", "<p>Caricamento dati aggiornati...</p>");
 
   try {
 
@@ -1008,12 +1008,12 @@ async function openLidoMeteoModal() {
         ? '<p class="stale-warning" style="margin-top:10px;">⚠️ La stazione risulta ferma da più di 2 ore: la rete ISPRA/RMLV può restare offline per giorni senza preavviso.</p>'
         : "");
 
-    showModal("Lido Meteo", html);
+    showModal("Lido", html);
 
   } catch (err) {
 
     console.error(err);
-    showModal("Lido Meteo", "<p>Errore nel caricamento dei dati, oppure la rete ISPRA/RMLV è al momento offline (è già successo per giorni consecutivi in passato).</p>");
+    showModal("Lido", "<p>Errore nel caricamento dei dati, oppure la rete ISPRA/RMLV è al momento offline (è già successo per giorni consecutivi in passato).</p>");
   }
 }
 
@@ -1240,20 +1240,20 @@ function updateLidoMeteoUI(lidoMeteo) {
   // dedicato.
   document.getElementById("subLidoMeteo").innerHTML =
     lidoMeteo.available && lidoMeteo.temperature != null
-      ? "Lido Meteo: " + lidoMeteo.temperature.toFixed(1) +
+      ? "Lido: " + lidoMeteo.temperature.toFixed(1) +
         " °C (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
         (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
-      : "Lido Meteo: n.d.";
+      : "Lido: n.d.";
 
   document.getElementById("humidityLidoMeteo").innerHTML =
     lidoMeteo.available && lidoMeteo.humidity != null
-      ? "Lido Meteo: " + lidoMeteo.humidity.toFixed(0) +
+      ? "Lido: " + lidoMeteo.humidity.toFixed(0) +
         " % (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
         (lidoMeteo.temperature != null
           ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(lidoMeteo.temperature, lidoMeteo.humidity).toFixed(1)} °C</span>`
           : "") +
         (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
-      : "Lido Meteo: n.d.";
+      : "Lido: n.d.";
 }
 
 async function loadAll() {

@@ -42,7 +42,7 @@
     },
     {
       "id": "lido_meteo",
-      "name": "Lido Meteo",
+      "name": "Lido",
       "type": "isprambiente",
       "role": "urban",
       "url": "",

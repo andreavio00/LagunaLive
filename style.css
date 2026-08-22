@@ -26,6 +26,14 @@ h1 {
   display: inline-block;
 }
 
+.footer-credits {
+  text-align: center;
+  color: #999;
+  font-size: 0.72em;
+  line-height: 1.6;
+  padding: 12px 20px 4px;
+}
+
 .card {
   background: white;
   padding: 14px 16px;
