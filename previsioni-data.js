@@ -56,8 +56,11 @@ async function fetchPrevisioniGrezze() {
     const modelli = [MODEL_LOCALE, MODEL_GLOBALE, MODEL_GLOBALE_2].join(",");
     // precipitation_probability tolta: inutile sui modelli deterministici
     // che usiamo (vedi discussione in chat) — teniamo solo i mm effettivi.
+    // precipitation_probability: la teniamo SOLO per le schede giorno dal
+    // 3° in poi (vedi chat) — non per l'orario, dove resta inaffidabile sui
+    // modelli deterministici. La prendiamo comunque solo dal modello globale.
     const variabili = "temperature_2m,apparent_temperature,relative_humidity_2m," +
-        "precipitation,weathercode,windspeed_10m,winddirection_10m,cape";
+        "precipitation,precipitation_probability,weathercode,windspeed_10m,winddirection_10m,cape";
 
     const url = `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${LAT}&longitude=${LON}` +
@@ -99,6 +102,7 @@ function costruisciOraModelli(hourly, indice) {
         const vento = leggiValore(hourly, "windspeed_10m", nomeModello, indice);
         const direzioneVento = leggiValore(hourly, "winddirection_10m", nomeModello, indice);
         const cape = leggiValore(hourly, "cape", nomeModello, indice);
+        const probPioggia = leggiValore(hourly, "precipitation_probability", nomeModello, indice);
 
         if (temp === null && code === null) continue; // modello non disponibile a quest'ora
 
@@ -111,7 +115,8 @@ function costruisciOraModelli(hourly, indice) {
             categoria: code !== null ? wmoToCategoria(code) : null,
             vento,
             direzioneVento,
-            cape
+            cape,
+            probPioggia
         };
     }
     return out;
@@ -421,6 +426,13 @@ async function ottieniPrevisioni() {
             .filter(v => v && v.precip !== null)
             .reduce((s, v) => s + v.precip, 0);
 
+        // Probabilità pioggia SOLO dal modello globale (ECMWF), non dalla
+        // sintesi prioritaria: la UI la userà solo dal 3° giorno in poi.
+        const probPioggiaValori = oreDelGiorno
+            .map(o => o.modelli.ecmwf?.probPioggia)
+            .filter(v => v !== null && v !== undefined);
+        const probPioggiaGenerale = probPioggiaValori.length ? Math.max(...probPioggiaValori) : null;
+
         const temporaleForteGiorno = fasceGiorno.some(f =>
             Object.values(f.modelli).some(m => m && m.temporaleForte)
         );
@@ -432,7 +444,8 @@ async function ottieniPrevisioni() {
                 min: temperature.length ? Math.min(...temperature) : null,
                 max: temperature.length ? Math.max(...temperature) : null,
                 categoria: categoriaGiorno(oreDelGiorno),
-                pioggiaTotale: Math.round(pioggiaTotale * 10) / 10
+                pioggiaTotale: Math.round(pioggiaTotale * 10) / 10,
+                probPioggiaGenerale
             },
             allarmi: {
                 temporaleForte: temporaleForteGiorno,

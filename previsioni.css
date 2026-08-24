@@ -73,11 +73,66 @@ body {
     gap: 8px;
 }
 
+/* Icona + temperatura raggruppate a sinistra (contesto chiaro:
+   striscia ore/giorni in alto) */
+.prvs-oraria-icona-temp {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .prvs-ora-temp-grande {
     font-size: 1.4rem;
     font-weight: 700;
     min-width: 44px;
     text-align: center;
+}
+
+/* Max/min ravvicinate nelle schede giorno (striscia esplosa) */
+.prvs-giorno-temp-maxmin {
+    font-size: 1.25rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Max/min impilate (non più affiancate: andavano oltre il bordo
+   scheda) nelle schede giorno della striscia esplosa */
+.prvs-giorno-temp-maxmin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+}
+
+.prvs-giorno-temp-maxmin .tmax {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.prvs-giorno-temp-maxmin .tmin {
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0.75;
+}
+
+/* Icona con badge allerta sovrapposto all'angolo, invece di una riga
+   a parte: evita che una sola scheda con allerta allunghi (per lo
+   stretch del flexbox) l'intera striscia scorrevole */
+.prvs-icona-wrapper {
+    position: relative;
+    display: inline-flex;
+}
+
+.prvs-badge-overlay {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 0.7rem;
+    background: #fff;
+    border-radius: 50%;
+    padding: 1px 3px;
+    line-height: 1.2;
+    box-shadow: 0 0 2px rgba(0,0,0,0.4);
 }
 
 .prvs-oraria-stats {
@@ -252,6 +307,27 @@ body {
     font-size: 0.85rem;
     opacity: 0.9;
     white-space: nowrap;
+}
+
+/* Righe fascia/ora nel dettaglio esploso: icona+temperatura
+   raggruppate a sinistra (più prominenti), dati residui a destra */
+.prvs-giorno-icona-temp {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.prvs-giorno-temp-grande {
+    font-size: 1.5rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.prvs-giorno-dati-destra {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    white-space: nowrap;
+    text-align: right;
 }
 
 /* Badge colorato dietro le icone meteo: senza, nuvole/pioggia chiare

@@ -76,6 +76,19 @@ function badgeAllarmi(allarmi) {
     return pezzi.length ? `<div class="prvs-badge-riga">${pezzi.join("")}</div>` : "";
 }
 
+/* Versione compatta dell'allerta, come piccolo badge sovrapposto
+   all'angolo dell'icona invece di una riga a parte: usata dove serve
+   mantenere l'altezza della scheda uniforme con le altre (striscia
+   scorrevole in alto), a differenza di badgeAllarmi() che va bene
+   nelle liste verticali dove ogni riga può avere altezza propria. */
+function badgeOverlay(allarmi) {
+    if (!allarmi) return "";
+    if (allarmi.temporaleForte) return `<span class="prvs-badge-overlay" title="Temporale forte">⛈️</span>`;
+    if (allarmi.nebbiaPersistente) return `<span class="prvs-badge-overlay" title="Nebbia persistente">🌫️</span>`;
+    if (allarmi.acquaAlta) return `<span class="prvs-badge-overlay" title="Acqua alta">🌊</span>`;
+    return "";
+}
+
 /* ============================================================
    CONCORDANZA TRA MODELLI — 3 pallini (temp/pioggia/vento),
    calcolo delegato a previsioni-data.js (soglie centralizzate lì).
@@ -118,6 +131,7 @@ function renderAttuale() {
    ============================================================ */
 function renderVistaNormale(previsioni) {
     rimuoviControlliEsplosione();
+    document.getElementById("prvs-label-striscia").textContent = "Prossime ore";
 
     const scroll = document.getElementById("prvs-oggi-scroll");
     scroll.innerHTML = "";
@@ -129,8 +143,10 @@ function renderVistaNormale(previsioni) {
         cella.innerHTML = `
             <div class="prvs-ora-testo">${String(ora.ora).padStart(2, "0")}:00</div>
             <div class="prvs-oraria-corpo">
-                ${iconaPer(ora.categoria, "chiaro", ora.ora)}
-                <div class="prvs-ora-temp-grande">${ora.temp !== null ? Math.round(ora.temp) + "°" : "—"}</div>
+                <div class="prvs-oraria-icona-temp">
+                    ${iconaPer(ora.categoria, "chiaro", ora.ora)}
+                    <div class="prvs-ora-temp-grande">${ora.temp !== null ? Math.round(ora.temp) + "°" : "—"}</div>
+                </div>
                 <div class="prvs-oraria-stats">
                     <div>🌧️ ${ora.precip !== null ? ora.precip.toFixed(1) + "mm" : "—"}</div>
                     <div>💧 ${ora.umidita !== null ? ora.umidita + "%" : "—"}</div>
@@ -187,25 +203,39 @@ function apriEsplosione(previsioni, dataSelezionata) {
 }
 
 function renderVistaEsplosa(previsioni) {
+    document.getElementById("prvs-label-striscia").textContent = "Prossimi giorni";
+
     // --- Riga 1: 8 schede giorno ---
     const scroll = document.getElementById("prvs-oggi-scroll");
     scroll.innerHTML = "";
 
-    for (const giorno of previsioni.riepilogoGiorni) {
+    for (const [idx, giorno] of previsioni.riepilogoGiorni.entries()) {
         const cella = document.createElement("div");
         cella.className = "prvs-oraria-cell";
         if (giorno.data === stato.giornoSelezionato) cella.classList.add("selezionata");
+
+        // Dal 3° giorno in poi (indice 2+) mostriamo anche la probabilità
+        // di pioggia dal modello globale, oltre ai mm — vedi chat.
+        const rigaOmbrello = idx >= 2 && giorno.sintesi.probPioggiaGenerale !== null
+            ? `<div>☂️ ${giorno.sintesi.probPioggiaGenerale}%</div>`
+            : "";
+
         cella.innerHTML = `
             <div class="prvs-ora-testo">${giorno.label}</div>
             <div class="prvs-oraria-corpo">
-                ${iconaPer(giorno.sintesi.categoria, "chiaro", 12)}
-                <div class="prvs-ora-temp-grande">${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}</div>
+                <div class="prvs-icona-wrapper">
+                    ${iconaPer(giorno.sintesi.categoria, "chiaro", 12)}
+                    ${badgeOverlay(giorno.allarmi)}
+                </div>
+                <div class="prvs-giorno-temp-maxmin">
+                    <div class="tmax">${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}</div>
+                    <div class="tmin">${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}</div>
+                </div>
                 <div class="prvs-oraria-stats">
-                    <div>🌡️ min ${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}</div>
                     <div>🌧️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}</div>
+                    ${rigaOmbrello}
                 </div>
             </div>
-            ${badgeAllarmi(giorno.allarmi)}
         `;
         cella.addEventListener("click", () => apriEsplosione(previsioni, giorno.data));
         scroll.appendChild(cella);
@@ -230,14 +260,12 @@ function renderVistaEsplosa(previsioni) {
             card.className = "prvs-giorno-card";
             card.innerHTML = `
                 <div class="prvs-giorno-label">${fascia.label}</div>
-                ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "scuro", oraRappresentativa)}
-                <div class="prvs-giorno-dati">
-                    <div class="prvs-giorno-temp-minmax">
-                        🌡️ ${primoModello ? primoModello.temp + "°" : "—"}
-                    </div>
-                    <div class="prvs-giorno-pioggia">
-                        🌧️ ${primoModello ? (primoModello.precip ?? 0) + "mm" : "—"}
-                    </div>
+                <div class="prvs-giorno-icona-temp">
+                    ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "scuro", oraRappresentativa)}
+                    <div class="prvs-giorno-temp-grande">${primoModello ? primoModello.temp + "°" : "—"}</div>
+                </div>
+                <div class="prvs-giorno-dati-destra">
+                    🌧️ ${primoModello ? (primoModello.precip ?? 0) + "mm" : "—"}
                 </div>
                 ${rigaConcordanza(primoModello, secondoModello)}
                 ${badgeAllarmi(fascia.allarmi)}
@@ -264,14 +292,12 @@ function renderVistaEsplosa(previsioni) {
             card.className = "prvs-giorno-card";
             card.innerHTML = `
                 <div class="prvs-giorno-label">${String(oraDett.ora).padStart(2, "0")}:00</div>
-                ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "scuro", oraDett.ora)}
-                <div class="prvs-giorno-dati">
-                    <div class="prvs-giorno-temp-minmax">
-                        🌡️ ${primoModello ? primoModello.temp + "°" : "—"}
-                    </div>
-                    <div class="prvs-giorno-pioggia">
-                        🌧️ ${primoModello ? (primoModello.precip ?? 0) + "mm" : "—"}
-                    </div>
+                <div class="prvs-giorno-icona-temp">
+                    ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "scuro", oraDett.ora)}
+                    <div class="prvs-giorno-temp-grande">${primoModello ? primoModello.temp + "°" : "—"}</div>
+                </div>
+                <div class="prvs-giorno-dati-destra">
+                    🌧️ ${primoModello ? (primoModello.precip ?? 0) + "mm" : "—"}
                 </div>
                 ${rigaConcordanza(primoModello, secondoModello)}
             `;
