@@ -1,0 +1,398 @@
+:root {
+    --blu: #0b6fa4;
+    --turchese: #1fb5c9;
+    --sfondo: #f5f7fb;
+    --bordo: #d0e4f5;
+    --grigio: #444;
+}
+
+body {
+    margin: 0;
+    background: var(--sfondo);
+    font-family: system-ui, sans-serif;
+    color: var(--grigio);
+}
+
+/* HEADER */
+.prvs-header {
+    background: linear-gradient(135deg, var(--blu), var(--turchese));
+    color: #fff;
+    padding: 1rem;
+    text-align: center;
+}
+
+/* SEZIONE GIORNI */
+.prvs-giorno {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--bordo);
+}
+
+.prvs-label {
+    font-size: 1.1rem;
+    color: var(--blu);
+    margin-bottom: 0.4rem;
+}
+
+/* RIGA ORARIA SCORREVOLE */
+.prvs-oraria-scroll {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 8px 0;
+    scroll-snap-type: x mandatory;
+}
+
+.prvs-oraria-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.prvs-oraria-cell {
+    min-width: 140px;
+    background: #f7fafc;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: left;
+    scroll-snap-align: start;
+    border: 1px solid var(--bordo);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.prvs-ora-testo {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* Corpo orizzontale: icona a sinistra, temperatura al centro,
+   colonnina di dati piccoli a destra */
+.prvs-oraria-corpo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.prvs-ora-temp-grande {
+    font-size: 1.4rem;
+    font-weight: 700;
+    min-width: 44px;
+    text-align: center;
+}
+
+.prvs-oraria-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* SINTESI GIORNI SUCCESSIVI */
+.prvs-sintesi {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 1rem;
+}
+
+/* BOTTONI */
+.prvs-btn {
+    width: 48%;
+    padding: 0.7rem;
+    margin: 0.4rem 1%;
+    background: var(--blu);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.prvs-btn-indietro {
+    width: 100%;
+    padding: 0.7rem;
+    background: var(--turchese);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+/* TABELLA MEDIO RAGGIO */
+.prvs-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.prvs-table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--bordo);
+}
+
+/* MODAL */
+.prvs-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+}
+
+.prvs-modal {
+    background: #fff;
+    width: 95%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.prvs-modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.prvs-modal-close {
+    font-size: 1.4rem;
+    cursor: pointer;
+}
+
+/* ============================================================
+   NUOVA STRUTTURA A FASCE ORIZZONTALI
+   ============================================================ */
+
+.prvs-fascia {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--bordo);
+    background: #fff;
+}
+
+.prvs-fascia-header {
+    background: linear-gradient(135deg, var(--blu), var(--turchese));
+    color: #fff;
+    text-align: center;
+    padding: 1.2rem 1rem;
+}
+
+.prvs-fascia-header h1 {
+    margin: 0 0 0.2rem 0;
+    font-size: 1.4rem;
+}
+
+.prvs-luogo {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin-bottom: 0.6rem;
+}
+
+.prvs-attuale {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.prvs-attuale-caricamento,
+.prvs-caricamento {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    font-weight: normal;
+}
+
+/* Righe giorno (fascia 3): più alte, sfondo blu scuro per far
+   risaltare le icone chiare (bianco/nuvole che sparivano sul bianco) */
+.prvs-giorno-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1rem;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--blu), var(--turchese));
+    color: #fff;
+}
+
+.prvs-giorno-card:active {
+    filter: brightness(0.92);
+}
+
+.prvs-giorno-label {
+    font-weight: 600;
+    font-size: 1rem;
+    flex: 1;
+}
+
+.prvs-giorno-temp-max {
+    font-size: 1.3rem;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: right;
+}
+
+.prvs-giorno-dati {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 90px;
+}
+
+.prvs-giorno-temp-minmax {
+    font-size: 1.05rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.prvs-giorno-pioggia {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
+/* Badge colorato dietro le icone meteo: senza, nuvole/pioggia chiare
+   sparivano sullo sfondo chiaro delle schede orarie. */
+.prvs-icona-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #4a9fc7 0%, #2f7fa8 100%);
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.15);
+}
+
+/* Scheda giorno selezionata nella vista esplosa */
+.prvs-oraria-cell.selezionata {
+    border: 2px solid var(--blu);
+    background: #cfe8f3;
+}
+
+/* Barra controlli vista esplosa: torna indietro + toggle ore/fasce */
+.prvs-controlli-esplosione {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: #fff;
+    border-bottom: 1px solid var(--bordo);
+}
+
+.prvs-torna {
+    color: var(--blu);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.prvs-toggle {
+    display: flex;
+    border: 1px solid var(--blu);
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.prvs-toggle-btn {
+    border: none;
+    background: #fff;
+    color: var(--blu);
+    padding: 0.3rem 0.9rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.prvs-toggle-btn.attivo {
+    background: var(--blu);
+    color: #fff;
+}
+
+/* Slot allerta acqua alta: per ora vuoto/invisibile finché non
+   colleghiamo la fonte dati marea. Quando attivo, mostrerà un
+   pallino/icona di avviso qui accanto alla temperatura. */
+.prvs-giorno-allerta {
+    width: 18px;
+    min-width: 18px;
+}
+
+.prvs-giorno-allerta:not(:empty) {
+    color: #ffcc00;
+    font-size: 1.2rem;
+}
+
+/* Bottone e link esterni (fascia 4) */
+.prvs-fascia-azioni {
+    text-align: center;
+}
+
+.prvs-link-esterni {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+}
+
+.prvs-link-esterno {
+    color: var(--blu);
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+    border: 1px solid var(--bordo);
+    border-radius: 8px;
+}
+
+/* TABELLA ORARIA */
+.prvs-table-oraria {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.prvs-table-oraria th,
+.prvs-table-oraria td {
+    border: 1px solid var(--bordo);
+    padding: 0.3rem;
+    font-size: 0.8rem;
+    text-align: center;
+}
+/* ============================================================
+   BADGE ALLARMI — solo su giorni/fasce (temporale forte, nebbia
+   persistente, acqua alta). Riga compatta di icone, invisibile
+   quando non ci sono allarmi attivi (nessun elemento vuoto).
+   ============================================================ */
+.prvs-badge-riga {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    width: 100%;
+    justify-content: flex-end;
+}
+
+.prvs-badge-allarme {
+    font-size: 1.1rem;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.3));
+}
+
+/* ============================================================
+   CONCORDANZA TRA MODELLI — 3 pallini (temp/pioggia/vento)
+   ============================================================ */
+.prvs-concordanza {
+    display: flex;
+    gap: 5px;
+    margin-top: 4px;
+    width: 100%;
+    justify-content: flex-end;
+}
+
+.prvs-pallino {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.prvs-pallino-verde  { background: #4caf50; }
+.prvs-pallino-giallo { background: #ffc107; }
+.prvs-pallino-rosso  { background: #f44336; }
