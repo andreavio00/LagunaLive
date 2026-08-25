@@ -115,26 +115,6 @@ body {
     opacity: 0.75;
 }
 
-/* Icona con badge allerta sovrapposto all'angolo, invece di una riga
-   a parte: evita che una sola scheda con allerta allunghi (per lo
-   stretch del flexbox) l'intera striscia scorrevole */
-.prvs-icona-wrapper {
-    position: relative;
-    display: inline-flex;
-}
-
-.prvs-badge-overlay {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    font-size: 0.7rem;
-    background: #fff;
-    border-radius: 50%;
-    padding: 1px 3px;
-    line-height: 1.2;
-    box-shadow: 0 0 2px rgba(0,0,0,0.4);
-}
-
 .prvs-oraria-stats {
     display: flex;
     flex-direction: column;
@@ -232,6 +212,21 @@ body {
     color: #fff;
     text-align: center;
     padding: 1.2rem 1rem;
+    position: relative;
+}
+
+.prvs-btn-impostazioni {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.8rem;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: #fff;
 }
 
 .prvs-fascia-header h1 {
@@ -429,14 +424,19 @@ body {
 .prvs-table-oraria th,
 .prvs-table-oraria td {
     border: 1px solid var(--bordo);
-    padding: 0.3rem;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.2rem;
+    font-size: 0.72rem;
     text-align: center;
+}
+
+.prvs-table-oraria td:first-child {
+    text-align: left;
+    font-weight: 600;
 }
 /* ============================================================
    BADGE ALLARMI — solo su giorni/fasce (temporale forte, nebbia
-   persistente, acqua alta). Riga compatta di icone, invisibile
-   quando non ci sono allarmi attivi (nessun elemento vuoto).
+   persistente, acqua alta). Sfondo bianco pieno dietro l'emoji:
+   sul gradiente blu i soli colori dell'emoji si notavano poco.
    ============================================================ */
 .prvs-badge-riga {
     display: flex;
@@ -446,9 +446,27 @@ body {
     justify-content: flex-end;
 }
 
+/* Versione a riga fissa: mantiene sempre lo stesso spazio anche
+   quando è vuota, così una scheda con allerta non "stira" (per via
+   dello stretch del flexbox) tutte le altre della striscia scorrevole */
+.prvs-badge-riga-fissa {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    min-height: 26px;
+    align-items: center;
+}
+
 .prvs-badge-allarme {
-    font-size: 1.1rem;
-    filter: drop-shadow(0 0 2px rgba(0,0,0,0.3));
+    font-size: 1.3rem;
+    background: #fff;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 
 /* ============================================================
@@ -456,19 +474,71 @@ body {
    ============================================================ */
 .prvs-concordanza {
     display: flex;
-    gap: 5px;
+    gap: 6px;
     margin-top: 4px;
     width: 100%;
     justify-content: flex-end;
 }
 
 .prvs-pallino {
-    width: 9px;
-    height: 9px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     display: inline-block;
+    border: 2px solid rgba(255,255,255,0.9);
+    box-shadow: 0 0 1px rgba(0,0,0,0.5);
 }
 
-.prvs-pallino-verde  { background: #4caf50; }
+.prvs-pallino-verde  { background: #66d16a; }
 .prvs-pallino-giallo { background: #ffc107; }
 .prvs-pallino-rosso  { background: #f44336; }
+
+/* Statistiche piccole (umidità/percepita) nelle sole schede orarie
+   del dettaglio, sfondo scuro: spazio libero tra icona+temp e pioggia */
+.prvs-oraria-stats-scuro {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    opacity: 0.95;
+}
+
+/* ============================================================
+   PANNELLO IMPOSTAZIONI — modello principale + campi opzionali
+   ============================================================ */
+.prvs-impostazioni-sezione {
+    margin-bottom: 1.2rem;
+}
+
+.prvs-impostazioni-titolo {
+    font-weight: 700;
+    color: var(--blu);
+    margin-bottom: 0.2rem;
+}
+
+.prvs-impostazioni-nota {
+    font-size: 0.78rem;
+    opacity: 0.7;
+    margin-bottom: 0.6rem;
+}
+
+.prvs-opzione-riga {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--bordo);
+}
+
+.prvs-opzione-riga input {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.prvs-opzione-riga input:disabled + * {
+    opacity: 0.4;
+}

@@ -10,6 +10,7 @@
 
 <!-- FASCIA 1 — Titolo, luogo, situazione attuale -->
 <header class="prvs-fascia prvs-fascia-header">
+    <button id="prvs-btn-impostazioni" class="prvs-btn-impostazioni" title="Impostazioni">⚙️</button>
     <h1>Previsioni Meteo</h1>
     <div class="prvs-luogo">Venezia — Centro Storico</div>
     <div id="prvs-attuale" class="prvs-attuale">
@@ -57,6 +58,29 @@
         </div>
         <div id="prvs-modal-body">
             <!-- Tabella fasce/modelli: la costruiamo nel prossimo passo -->
+        </div>
+    </div>
+</div>
+
+<!-- MODAL IMPOSTAZIONI -->
+<div id="prvs-modal-impostazioni" class="prvs-modal-backdrop">
+    <div class="prvs-modal">
+        <div class="prvs-modal-header">
+            <h3>Impostazioni</h3>
+            <span id="prvs-impostazioni-close" class="prvs-modal-close">&times;</span>
+        </div>
+        <div id="prvs-impostazioni-body">
+            <div class="prvs-impostazioni-sezione">
+                <div class="prvs-impostazioni-titolo">Modello principale</div>
+                <div class="prvs-impostazioni-nota">Usato nelle schermate iniziali quando non stai confrontando i modelli.</div>
+                <div id="prvs-scelta-modello"></div>
+            </div>
+            <div class="prvs-impostazioni-sezione">
+                <div class="prvs-impostazioni-titolo">Campi nel dettaglio orario</div>
+                <div class="prvs-impostazioni-nota">Fino a 4 in aggiunta a meteo, temperatura e pioggia (sempre visibili).</div>
+                <div id="prvs-scelta-campi"></div>
+            </div>
+            <button id="prvs-btn-salva-impostazioni" class="prvs-btn" style="width:100%;margin:0.8rem 0 0 0;">Salva</button>
         </div>
     </div>
 </div>

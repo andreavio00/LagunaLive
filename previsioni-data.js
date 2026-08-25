@@ -60,7 +60,8 @@ async function fetchPrevisioniGrezze() {
     // 3° in poi (vedi chat) — non per l'orario, dove resta inaffidabile sui
     // modelli deterministici. La prendiamo comunque solo dal modello globale.
     const variabili = "temperature_2m,apparent_temperature,relative_humidity_2m," +
-        "precipitation,precipitation_probability,weathercode,windspeed_10m,winddirection_10m,cape";
+        "precipitation,precipitation_probability,weathercode,windspeed_10m,winddirection_10m," +
+        "pressure_msl,cape";
 
     const url = `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${LAT}&longitude=${LON}` +
@@ -103,6 +104,7 @@ function costruisciOraModelli(hourly, indice) {
         const direzioneVento = leggiValore(hourly, "winddirection_10m", nomeModello, indice);
         const cape = leggiValore(hourly, "cape", nomeModello, indice);
         const probPioggia = leggiValore(hourly, "precipitation_probability", nomeModello, indice);
+        const pressione = leggiValore(hourly, "pressure_msl", nomeModello, indice);
 
         if (temp === null && code === null) continue; // modello non disponibile a quest'ora
 
@@ -116,19 +118,37 @@ function costruisciOraModelli(hourly, indice) {
             vento,
             direzioneVento,
             cape,
-            probPioggia
+            probPioggia,
+            pressione
         };
     }
     return out;
 }
 
 /* ============================================================
+   PREFERENZA MODELLO PRINCIPALE
+   "auto" (default) = priorità ARPAE→ECMWF→Seamless, come sempre.
+   Se l'utente sceglie un modello specifico dal pannello impostazioni,
+   lo usiamo finché è disponibile per quell'ora/giorno, altrimenti
+   ricadiamo comunque sulla priorità automatica (mai un buco vuoto).
+   ============================================================ */
+let preferenzaModello = "auto";
+
+function impostaPreferenzaModello(valore) {
+    preferenzaModello = valore;
+}
+
+/* ============================================================
    SINTESI META-MODELLO
-   Priorità: ARPAE se disponibile, altrimenti ECMWF, altrimenti ICON.
-   Usata per scegliere UN'icona/temperatura rappresentativa quando
-   serve un valore solo (es. fascia riepilogo, scroll di oggi).
+   Priorità: quella scelta dall'utente se disponibile, altrimenti
+   ARPAE→ECMWF→Seamless. Usata per scegliere UN'icona/temperatura
+   rappresentativa quando serve un valore solo.
    ============================================================ */
 function sintesiPrioritaria(modelli) {
+    if (preferenzaModello === "arpae" && modelli.arpae) return modelli.arpae;
+    if (preferenzaModello === "ecmwf" && modelli.ecmwf) return modelli.ecmwf;
+    if (preferenzaModello === "icon" && modelli.icon) return modelli.icon;
+
     if (modelli.arpae) return modelli.arpae;
     if (modelli.ecmwf) return modelli.ecmwf;
     if (modelli.icon) return modelli.icon;
@@ -478,6 +498,7 @@ window.PrevisioniData = {
     etichettaGiorno,
     formattaDataBreve,
     calcolaConcordanza,
+    impostaPreferenzaModello,
     FASCE_ORARIE,
     MODEL_LOCALE,
     MODEL_GLOBALE,
