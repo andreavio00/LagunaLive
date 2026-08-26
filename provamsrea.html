@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test JSON Marea</title>
+    <style>
+        body { font-family: monospace; padding: 1rem; background: #f5f5f5; }
+        h1 { font-size: 1.1rem; }
+        #stato { font-weight: bold; margin-bottom: 1rem; padding: 0.6rem; border-radius: 6px; }
+        .ok { background: #d4edda; color: #155724; }
+        .errore { background: #f8d7da; color: #721c24; }
+        pre { background: #fff; padding: 1rem; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+    </style>
+</head>
+<body>
+
+<h1>Test chiamata JSON — Centro Maree</h1>
+<div id="stato">In corso...</div>
+<pre id="risultato">Caricamento...</pre>
+
+<script>
+const URL_WORKER = "https://previsionimarea.andrea-vio.workers.dev/";
+
+async function testFetch() {
+    const statoEl = document.getElementById("stato");
+    const risultatoEl = document.getElementById("risultato");
+
+    try {
+        const inizio = performance.now();
+        const res = await fetch(URL_WORKER);
+        const tempo = Math.round(performance.now() - inizio);
+
+        const testo = await res.text();
+
+        statoEl.textContent = `HTTP ${res.status} — risposta in ${tempo}ms`;
+        statoEl.className = res.ok ? "ok" : "errore";
+
+        let mostrato = testo;
+        try {
+            const json = JSON.parse(testo);
+            mostrato = JSON.stringify(json, null, 2);
+            if (json.numero_previsioni > 0) {
+                statoEl.textContent += ` — ${json.numero_previsioni} previsioni trovate!`;
+            } else {
+                statoEl.textContent += ` — previsioni VUOTE`;
+            }
+        } catch (e) {
+            mostrato = "Risposta non è JSON valido:\n\n" + testo;
+        }
+
+        risultatoEl.textContent = mostrato;
+
+    } catch (errore) {
+        statoEl.textContent = "Errore di rete/CORS: " + errore.message;
+        statoEl.className = "errore";
+        risultatoEl.textContent = errore.stack || errore.toString();
+    }
+}
+
+testFetch();
+</script>
+
+</body>
+</html>
