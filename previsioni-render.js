@@ -23,7 +23,8 @@ const CAMPI_OPZIONALI_DISPONIBILI = [
     { id: "vento", label: "Vento (solo se ≥40 km/h)", icona: "💨", unita: "km/h", speciale: "vento" },
     { id: "pressione", label: "Pressione", icona: "🔽", unita: "hPa", arrotonda: true },
     { id: "cin", label: "Inibizione convettiva (CIN)", icona: "🧊", unita: " J/kg" },
-    { id: "neve", label: "Neve", icona: "❄️", unita: "cm" }
+    { id: "neve", label: "Neve", icona: "❄️", unita: "cm" },
+    { id: "marea", label: "Marea (stimata)", icona: "🌊", unita: "cm" }
 ];
 
 const PREFERENZE_DEFAULT = {
@@ -368,7 +369,7 @@ function renderVistaEsplosa(previsioni) {
                     <div class="prvs-giorno-temp-grande">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
                 </div>
                 <div class="prvs-oraria-stats-scuro">
-                    ${renderCampiOpzionali(rappresentativo)}
+                    ${renderCampiOpzionali({ ...rappresentativo, marea: oraDett.marea })}
                 </div>
                 <div class="prvs-giorno-dati-destra">
                     🌧️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}

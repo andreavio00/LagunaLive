@@ -452,6 +452,36 @@ function acquaAltaNellaFascia(mareaPrevisioni, dataGiorno, oreInizio, oreFine) {
 }
 
 /* ============================================================
+   STIMA ORARIA DELLA MAREA — i dati grezzi sono solo i picchi
+   (min/max, ~4 al giorno). Per un valore ogni ora interpoliamo tra
+   il picco precedente e quello successivo con una curva a coseno
+   (più fedele di una lineare all'andamento reale della marea, che
+   rallenta vicino ai picchi e accelera a metà). È una STIMA, non
+   un dato osservato: la UI la etichetta come tale.
+   ============================================================ */
+function costruisciSerieMarea(mareaPrevisioni) {
+    return mareaPrevisioni
+        .map(m => ({ istante: new Date(m.datetime).getTime(), valore: m.valore }))
+        .filter(m => !Number.isNaN(m.istante))
+        .sort((a, b) => a.istante - b.istante);
+}
+
+function stimaMarea(serieMarea, istanteMs) {
+    if (serieMarea.length < 2) return null;
+
+    for (let i = 0; i < serieMarea.length - 1; i++) {
+        const prima = serieMarea[i];
+        const dopo = serieMarea[i + 1];
+        if (prima.istante <= istanteMs && istanteMs <= dopo.istante) {
+            const frazione = (istanteMs - prima.istante) / (dopo.istante - prima.istante);
+            const fattore = (1 - Math.cos(frazione * Math.PI)) / 2; // 0→1 ad "S", non lineare
+            return Math.round(prima.valore + (dopo.valore - prima.valore) * fattore);
+        }
+    }
+    return null; // istante fuori dal range di picchi disponibili
+}
+
+/* ============================================================
    FUNZIONE PRINCIPALE — restituisce la struttura dati unificata
    pronta per il rendering (vedi schema discusso in chat).
    ============================================================ */
@@ -515,6 +545,7 @@ async function ottieniDatiGrezzi(forzaRefresh = false) {
 function elaboraPrevisioni(datiGrezzi) {
     const oreComplete = datiGrezzi.oreComplete;
     const datiGiornalieri = datiGrezzi.datiGiornalieri || [];
+    const serieMarea = costruisciSerieMarea(datiGrezzi.mareaPrevisioni || []);
     const now = new Date();
     const oggiStr = dataLocaleISO(now);
 
@@ -531,6 +562,7 @@ function elaboraPrevisioni(datiGrezzi) {
         .map(o => ({
             data: o.data,
             ora: o.ora,
+            marea: stimaMarea(serieMarea, new Date(o.timestamp).getTime()),
             ...sintesiPrioritaria(o.modelli)
         }));
 
@@ -547,7 +579,8 @@ function elaboraPrevisioni(datiGrezzi) {
         const oreDettaglio = oreDelGiorno.map(o => ({
             ora: o.ora,
             modelli: o.modelli,
-            sintesi: sintesiPrioritaria(o.modelli)
+            sintesi: sintesiPrioritaria(o.modelli),
+            marea: stimaMarea(serieMarea, new Date(o.timestamp).getTime())
         }));
 
         const temperature = oreDelGiorno
