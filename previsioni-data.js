@@ -17,6 +17,13 @@ const MODEL_GLOBALE_2 = "icon_seamless";           // DWD ICON globale, 11km, or
 
 const GIORNI_TOTALI = 7; // fermiamo le previsioni a 1 settimana
 
+/* MAREA — worker personale che fa da proxy al Centro Maree del Comune
+   di Venezia (la pagina originale ha protezioni anti-bot che bloccano
+   il fetch diretto). Soglia "molto sostenuta" (110cm) decisa in chat:
+   coerente con gli altri 2 allarmi, pensata per eventi non ordinari. */
+const URL_MAREA = "https://previsionimarea.andrea-vio.workers.dev/";
+const SOGLIA_ACQUA_ALTA = 110;
+
 /* Fasce orarie del giorno (0-23) */
 const FASCE_ORARIE = [
     { id: "notte",       label: "Notte",       oreInizio: 0,  oreFine: 6 },
@@ -61,11 +68,14 @@ async function fetchPrevisioniGrezze() {
     // modelli deterministici. La prendiamo comunque solo dal modello globale.
     const variabili = "temperature_2m,apparent_temperature,relative_humidity_2m," +
         "precipitation,precipitation_probability,weathercode,windspeed_10m,winddirection_10m," +
-        "pressure_msl,cape";
+        "pressure_msl,cape,convective_inhibition,snowfall";
+
+    const giornalieri = "sunrise,sunset,uv_index_max";
 
     const url = `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${LAT}&longitude=${LON}` +
         `&hourly=${variabili}` +
+        `&daily=${giornalieri}` +
         `&models=${modelli}` +
         `&forecast_days=${GIORNI_TOTALI}` +
         `&timezone=auto`;
@@ -75,6 +85,21 @@ async function fetchPrevisioniGrezze() {
     return res.json();
 }
 
+/* MAREA — se il worker fallisce o è irraggiungibile, torniamo un
+   array vuoto invece di lanciare un errore: le previsioni meteo
+   devono funzionare comunque anche senza il dato marea. */
+async function fetchPrevisioniMarea() {
+    try {
+        const res = await fetch(URL_MAREA);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return Array.isArray(json.previsioni) ? json.previsioni : [];
+    } catch (e) {
+        console.warn("Previsioni marea non disponibili:", e);
+        return [];
+    }
+}
+
 /* Legge un valore orario per un dato modello, gestendo suffissi e null */
 function leggiValore(hourly, variabile, modello, indice) {
     const chiave = `${variabile}_${modello}`;
@@ -82,6 +107,20 @@ function leggiValore(hourly, variabile, modello, indice) {
     if (!arr) return null;
     const v = arr[indice];
     return (v === null || v === undefined) ? null : v;
+}
+
+/* Legge un valore giornaliero (sunrise/sunset/uv_index_max...), che
+   arriva comunque con suffisso per modello. Sono quasi identici tra
+   modelli (specie sunrise/sunset, calcoli astronomici) quindi proviamo
+   in ordine di priorità ARPAE→ECMWF→Seamless, il primo che risponde. */
+function leggiValoreGiornaliero(daily, variabile, indiceGiorno) {
+    for (const modello of [MODEL_LOCALE, MODEL_GLOBALE, MODEL_GLOBALE_2]) {
+        const arr = daily[`${variabile}_${modello}`];
+        if (arr && arr[indiceGiorno] !== null && arr[indiceGiorno] !== undefined) {
+            return arr[indiceGiorno];
+        }
+    }
+    return null;
 }
 
 /* Costruisce, per un dato indice orario, l'oggetto con i dati di tutti
@@ -103,6 +142,8 @@ function costruisciOraModelli(hourly, indice) {
         const vento = leggiValore(hourly, "windspeed_10m", nomeModello, indice);
         const direzioneVento = leggiValore(hourly, "winddirection_10m", nomeModello, indice);
         const cape = leggiValore(hourly, "cape", nomeModello, indice);
+        const cin = leggiValore(hourly, "convective_inhibition", nomeModello, indice);
+        const neve = leggiValore(hourly, "snowfall", nomeModello, indice);
         const probPioggia = leggiValore(hourly, "precipitation_probability", nomeModello, indice);
         const pressione = leggiValore(hourly, "pressure_msl", nomeModello, indice);
 
@@ -118,6 +159,8 @@ function costruisciOraModelli(hourly, indice) {
             vento,
             direzioneVento,
             cape,
+            cin,
+            neve,
             probPioggia,
             pressione
         };
@@ -230,7 +273,7 @@ function categoriaGiorno(oreDelGiorno) {
    Riceve un array di "ore modelli" (vedi costruisciOraModelli)
    già filtrate per un singolo giorno, e restituisce le 4 fasce.
    ============================================================ */
-function aggregaInFasce(oreDelGiorno) {
+function aggregaInFasce(oreDelGiorno, mareaPrevisioni, dataGiorno) {
     return FASCE_ORARIE.map(fascia => {
         const oreFascia = oreDelGiorno.filter(o =>
             o.ora >= fascia.oreInizio && o.ora < fascia.oreFine
@@ -311,7 +354,7 @@ function aggregaInFasce(oreDelGiorno) {
             allarmi: {
                 temporaleForte: Object.values(modelliFascia).some(m => m && m.temporaleForte),
                 nebbiaPersistente: nebbiaPersistente(oreFascia),
-                acquaAlta: null
+                acquaAlta: acquaAltaNellaFascia(mareaPrevisioni, dataGiorno, fascia.oreInizio, fascia.oreFine)
             }
         };
     });
@@ -382,15 +425,57 @@ function nebbiaPersistente(ore, soglia = 4) {
 }
 
 /* ============================================================
+   ACQUA ALTA — soglia "molto sostenuta" (110cm) decisa in chat.
+   I dati arrivano dal worker personale (vedi URL_MAREA), con voci
+   {data, ora, tipo: "min"|"max", valore} — guardiamo solo i "max".
+   ============================================================ */
+function mareaMassimaDelGiorno(mareaPrevisioni, dataGiorno) {
+    const massimi = mareaPrevisioni
+        .filter(m => m.data === dataGiorno && m.tipo === "max")
+        .map(m => m.valore);
+    return massimi.length ? Math.max(...massimi) : null;
+}
+
+function acquaAltaNelGiorno(mareaPrevisioni, dataGiorno) {
+    const massimo = mareaMassimaDelGiorno(mareaPrevisioni, dataGiorno);
+    return massimo !== null && massimo >= SOGLIA_ACQUA_ALTA;
+}
+
+/* Per fascia: guardiamo solo i picchi "max" la cui ora (HH:MM) cade
+   nell'intervallo della fascia, non l'intera giornata come sopra. */
+function acquaAltaNellaFascia(mareaPrevisioni, dataGiorno, oreInizio, oreFine) {
+    return mareaPrevisioni.some(m => {
+        if (m.data !== dataGiorno || m.tipo !== "max" || m.valore < SOGLIA_ACQUA_ALTA) return false;
+        const oraNum = Number(m.ora.split(":")[0]);
+        return oraNum >= oreInizio && oraNum < oreFine;
+    });
+}
+
+/* ============================================================
    FUNZIONE PRINCIPALE — restituisce la struttura dati unificata
    pronta per il rendering (vedi schema discusso in chat).
    ============================================================ */
-async function ottieniPrevisioni() {
-    const data = await fetchPrevisioniGrezze();
-    const hourly = data.hourly;
-    const now = new Date();
+/* ============================================================
+   DATI GREZZI — un solo fetch scarica già tutti e 3 i modelli.
+   Li teniamo in cache qui: cambiare la preferenza di modello NON
+   richiede una nuova chiamata di rete, solo ri-elaborare questi
+   stessi dati già scaricati (vedi elaboraPrevisioni sotto).
+   ============================================================ */
+let datiGrezziCache = null;
 
-    // Costruiamo un array di "ore modelli" con data/ora leggibili
+async function ottieniDatiGrezzi(forzaRefresh = false) {
+    if (datiGrezziCache && !forzaRefresh) return datiGrezziCache;
+
+    // In parallelo: se la marea è lenta o fallisce, non rallenta né
+    // blocca le previsioni meteo (fetchPrevisioniMarea non lancia mai).
+    const [data, mareaPrevisioni] = await Promise.all([
+        fetchPrevisioniGrezze(),
+        fetchPrevisioniMarea()
+    ]);
+
+    const hourly = data.hourly;
+    const daily = data.daily || {};
+
     const oreComplete = hourly.time.map((t, i) => {
         const d = new Date(t);
         return {
@@ -401,7 +486,36 @@ async function ottieniPrevisioni() {
         };
     });
 
-    // OGGI — solo ore future, sintesi prioritaria per ogni ora
+    // Le date del blocco daily sono già in formato YYYY-MM-DD e nello
+    // stesso ordine di forecast_days, quindi l'indice di array coincide
+    // con l'indice giorno usato altrove (0=oggi, 1=domani, ...).
+    const datiGiornalieri = (daily.time || []).map((dataStr, idx) => ({
+        data: dataStr,
+        alba: leggiValoreGiornaliero(daily, "sunrise", idx),
+        tramonto: leggiValoreGiornaliero(daily, "sunset", idx),
+        uvMax: leggiValoreGiornaliero(daily, "uv_index_max", idx)
+    }));
+
+    datiGrezziCache = {
+        oreComplete,
+        datiGiornalieri,
+        mareaPrevisioni,
+        scaricatoAlle: new Date().toISOString()
+    };
+    return datiGrezziCache;
+}
+
+/* ============================================================
+   ELABORAZIONE — pura, sincrona, nessuna chiamata di rete.
+   Usa sintesiPrioritaria() internamente, quindi riflette sempre
+   la preferenza di modello corrente (impostaPreferenzaModello).
+   Richiamabile a piacere (es. quando l'utente cambia preferenza)
+   ripartendo dagli stessi dati grezzi già in cache.
+   ============================================================ */
+function elaboraPrevisioni(datiGrezzi) {
+    const oreComplete = datiGrezzi.oreComplete;
+    const datiGiornalieri = datiGrezzi.datiGiornalieri || [];
+    const now = new Date();
     const oggiStr = dataLocaleISO(now);
 
     // PROSSIME 10 ORE — striscia unica che può attraversare la mezzanotte,
@@ -427,7 +541,7 @@ async function ottieniPrevisioni() {
 
     const riepilogoGiorni = dateUniche.map((dataGiorno, idx) => {
         const oreDelGiorno = oreComplete.filter(o => o.data === dataGiorno);
-        const fasceGiorno = aggregaInFasce(oreDelGiorno);
+        const fasceGiorno = aggregaInFasce(oreDelGiorno, datiGrezzi.mareaPrevisioni, dataGiorno);
 
         // Dettaglio ora per ora coi modelli grezzi, per la vista "esplosa"
         const oreDettaglio = oreDelGiorno.map(o => ({
@@ -457,6 +571,8 @@ async function ottieniPrevisioni() {
             Object.values(f.modelli).some(m => m && m.temporaleForte)
         );
 
+        const infoGiornaliera = datiGiornalieri.find(d => d.data === dataGiorno);
+
         return {
             data: dataGiorno,
             label: etichettaGiorno(dataGiorno, idx),
@@ -467,11 +583,18 @@ async function ottieniPrevisioni() {
                 pioggiaTotale: Math.round(pioggiaTotale * 10) / 10,
                 probPioggiaGenerale
             },
+            giornaliero: {
+                // sunrise/sunset arrivano come "2026-08-25T06:12", teniamo solo l'ora
+                alba: infoGiornaliera?.alba ? infoGiornaliera.alba.slice(11, 16) : null,
+                tramonto: infoGiornaliera?.tramonto ? infoGiornaliera.tramonto.slice(11, 16) : null,
+                uvMax: infoGiornaliera?.uvMax ?? null
+            },
             allarmi: {
                 temporaleForte: temporaleForteGiorno,
                 nebbiaPersistente: nebbiaPersistente(oreDelGiorno),
-                acquaAlta: null // TODO: nessuna fonte dati collegata ancora
+                acquaAlta: acquaAltaNelGiorno(datiGrezzi.mareaPrevisioni, dataGiorno)
             },
+            mareaMassima: mareaMassimaDelGiorno(datiGrezzi.mareaPrevisioni, dataGiorno),
             fasceGiorno,
             oreDettaglio
         };
@@ -491,9 +614,24 @@ async function ottieniPrevisioni() {
     };
 }
 
+/* Funzione "pubblica" usata al primo caricamento: scarica (o riusa la
+   cache) e poi elabora. forzaRefresh=true per un refresh manuale vero. */
+async function ottieniPrevisioni(forzaRefresh = false) {
+    const grezzi = await ottieniDatiGrezzi(forzaRefresh);
+    return elaboraPrevisioni(grezzi);
+}
+
+/* Ricalcolo SENZA rete: da chiamare quando cambia solo la preferenza
+   di modello. Torna null se non è ancora stato fatto nessun fetch. */
+function ricalcolaPrevisioni() {
+    if (!datiGrezziCache) return null;
+    return elaboraPrevisioni(datiGrezziCache);
+}
+
 /* Esportiamo le funzioni che serviranno al modulo di rendering */
 window.PrevisioniData = {
     ottieniPrevisioni,
+    ricalcolaPrevisioni,
     wmoToCategoria,
     etichettaGiorno,
     formattaDataBreve,

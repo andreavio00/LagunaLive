@@ -21,7 +21,9 @@ const CAMPI_OPZIONALI_DISPONIBILI = [
     { id: "percepita", label: "Temperatura percepita", icona: "🥵", unita: "°", arrotonda: true },
     { id: "umidita", label: "Umidità", icona: "💧", unita: "%" },
     { id: "vento", label: "Vento (solo se ≥40 km/h)", icona: "💨", unita: "km/h", speciale: "vento" },
-    { id: "pressione", label: "Pressione", icona: "🔽", unita: "hPa", arrotonda: true }
+    { id: "pressione", label: "Pressione", icona: "🔽", unita: "hPa", arrotonda: true },
+    { id: "cin", label: "Inibizione convettiva (CIN)", icona: "🧊", unita: " J/kg" },
+    { id: "neve", label: "Neve", icona: "❄️", unita: "cm" }
 ];
 
 const PREFERENZE_DEFAULT = {
@@ -140,12 +142,15 @@ function renderCampiOpzionali(modello) {
    BADGE ALLARMI — solo su giorni/fasce, mai sull'ora singola
    (il weathercode orario è già abbastanza esplicito, vedi chat).
    ============================================================ */
-function badgeAllarmi(allarmi) {
+function badgeAllarmi(allarmi, mareaMassima = null) {
     if (!allarmi) return "";
     const pezzi = [];
     if (allarmi.temporaleForte) pezzi.push(`<span class="prvs-badge-allarme" title="Temporale forte">⛈️</span>`);
     if (allarmi.nebbiaPersistente) pezzi.push(`<span class="prvs-badge-allarme" title="Nebbia persistente">🌫️</span>`);
-    if (allarmi.acquaAlta) pezzi.push(`<span class="prvs-badge-allarme" title="Acqua alta">🌊</span>`);
+    if (allarmi.acquaAlta) {
+        const titolo = mareaMassima !== null ? `Acqua alta — picco ${mareaMassima}cm` : "Acqua alta";
+        pezzi.push(`<span class="prvs-badge-allarme" title="${titolo}">🌊</span>`);
+    }
     return pezzi.join("");
 }
 
@@ -244,7 +249,7 @@ function creaCardGiorno(giorno) {
                 🌧️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}
             </div>
         </div>
-        <div class="prvs-badge-riga">${badgeAllarmi(giorno.allarmi)}</div>
+        <div class="prvs-badge-riga">${badgeAllarmi(giorno.allarmi, giorno.mareaMassima)}</div>
     `;
     return card;
 }
@@ -290,7 +295,7 @@ function renderVistaEsplosa(previsioni) {
                     ${rigaOmbrello}
                 </div>
             </div>
-            <div class="prvs-badge-riga-fissa">${badgeAllarmi(giorno.allarmi)}</div>
+            <div class="prvs-badge-riga-fissa">${badgeAllarmi(giorno.allarmi, giorno.mareaMassima)}</div>
         `;
         cella.addEventListener("click", () => apriEsplosione(previsioni, giorno.data));
         scroll.appendChild(cella);
@@ -468,6 +473,9 @@ function apriDettaglioConfronto(titolo, arpae, ecmwf, seamless) {
             ${riga("Umidità", "umidita", "%")}
             ${riga("Pioggia", "precip", "mm")}
             ${riga("Vento", "vento", "km/h", true)}
+            ${riga("Pressione", "pressione", "hPa", true)}
+            ${riga("CIN", "cin", " J/kg")}
+            ${riga("Neve", "neve", "cm")}
         </tbody>
     `;
 
@@ -532,7 +540,7 @@ document.getElementById("prvs-impostazioni-close").addEventListener("click", () 
 });
 modalImpostazioni.onclick = e => { if (e.target === modalImpostazioni) modalImpostazioni.style.display = "none"; };
 
-document.getElementById("prvs-btn-salva-impostazioni").addEventListener("click", async () => {
+document.getElementById("prvs-btn-salva-impostazioni").addEventListener("click", () => {
     const modelloScelto = document.querySelector('input[name="prvs-modello"]:checked')?.value || "auto";
     const campiScelti = [...document.querySelectorAll(".prvs-check-campo:checked")].map(c => c.value);
     const modelloCambiato = modelloScelto !== preferenze.modelloPrincipale;
@@ -542,12 +550,14 @@ document.getElementById("prvs-btn-salva-impostazioni").addEventListener("click",
     modalImpostazioni.style.display = "none";
 
     if (modelloCambiato) {
-        // Cambia l'aggregazione dei dati stessa (non solo la grafica):
-        // serve ricalcolare da capo, quindi rifacciamo il giro completo.
         PrevisioniData.impostaPreferenzaModello(preferenze.modelloPrincipale);
-        await init();
-    } else if (previsioniCache) {
-        // Solo i campi mostrati sono cambiati: basta ridisegnare
+    }
+
+    // Sia che sia cambiato il modello sia i campi: nessuna nuova chiamata
+    // di rete, tutti e 3 i modelli sono già scaricati. Ricalcoliamo solo
+    // la sintesi (istantaneo) e ridisegniamo la vista corrente.
+    if (previsioniCache) {
+        previsioniCache = PrevisioniData.ricalcolaPrevisioni() || previsioniCache;
         if (stato.giornoSelezionato) renderVistaEsplosa(previsioniCache);
         else renderVistaNormale(previsioniCache);
     }
