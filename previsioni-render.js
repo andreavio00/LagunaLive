@@ -1,8 +1,11 @@
 /* ============================================================
    PREVISIONI-RENDER.JS
    Legge la struttura dati da previsioni-data.js e la disegna.
-   Gestisce 2 viste: NORMALE (prossime ore + 3 giorni) ed ESPLOSA
-   (8 giorni in alto + dettaglio orario/fasce del giorno scelto).
+   Pagina unica: striscia "prossime ore" fissa in alto + 7 righe
+   giorno (oggi + 6 successivi) con accordion inline — click su una
+   riga apre sotto di sé le chip orarie (oggi/domani) o di fascia
+   (gli altri 5 giorni); click su una chip apre il modal di
+   confronto tra i 3 modelli.
    ============================================================ */
 
 const ICON_PATH = "icons/";
@@ -137,19 +140,57 @@ function renderCampiOpzionali(modello) {
 }
 
 /* ============================================================
-   BADGE ALLARMI — solo su giorni/fasce, mai sull'ora singola
-   (il weathercode orario è già abbastanza esplicito, vedi chat).
+   DESCRIZIONE TESTUALE DEL METEO — frase breve sotto il nome del
+   giorno, derivata dalla categoria (weathercode) già calcolata.
    ============================================================ */
-function badgeAllarmi(allarmi, mareaMassima = null) {
+const CATEGORIA_TESTO = {
+    sun: "Sereno",
+    partly: "Poco nuvoloso",
+    cloud: "Nuvoloso",
+    rain: "Pioggia",
+    storm: "Temporale",
+    snow: "Neve",
+    fog: "Nebbia"
+};
+function categoriaTesto(categoria) {
+    return CATEGORIA_TESTO[categoria] || "—";
+}
+
+/* ============================================================
+   TAG ALLARME — pillola colorata sotto la descrizione meteo
+   (non più badge circolari a destra).
+   ============================================================ */
+function tagAllarmi(allarmi, mareaMassima = null) {
     if (!allarmi) return "";
     const pezzi = [];
-    if (allarmi.temporaleForte) pezzi.push(`<span class="prvs-badge-allarme" title="Temporale forte">⛈️</span>`);
-    if (allarmi.nebbiaPersistente) pezzi.push(`<span class="prvs-badge-allarme" title="Nebbia persistente">🌫️</span>`);
+    if (allarmi.temporaleForte) pezzi.push(`<span class="prvs-tag-allarme prvs-tag-temporale">Temporale forte</span>`);
+    if (allarmi.nebbiaPersistente) pezzi.push(`<span class="prvs-tag-allarme prvs-tag-nebbia">Nebbia persistente</span>`);
     if (allarmi.acquaAlta) {
-        const titolo = mareaMassima !== null ? `Acqua alta — picco ${mareaMassima}cm` : "Acqua alta";
-        pezzi.push(`<span class="prvs-badge-allarme" title="${titolo}">🌊</span>`);
+        const testo = mareaMassima !== null ? `Acqua alta · ${mareaMassima}cm` : "Acqua alta";
+        pezzi.push(`<span class="prvs-tag-allarme prvs-tag-acqua-alta">${testo}</span>`);
     }
     return pezzi.join("");
+}
+
+/* ============================================================
+   BARRA PIOGGIA — sostituisce il semplice testo "☂️ Xmm" nella
+   riga giorno: stesso linguaggio visivo dell'idrometro marea.
+   ============================================================ */
+function coloreMm(mm) {
+    if (mm === null || mm === undefined) return "rgba(16,38,43,0.15)";
+    if (mm >= 8) return "var(--nizioleto)";
+    if (mm >= 2) return "var(--sole)";
+    if (mm > 0)  return "var(--acqua)";
+    return "rgba(16,38,43,0.15)";
+}
+function pioggiaBar(mm, scalaMax = 12) {
+    const valore = mm !== null && mm !== undefined ? mm : 0;
+    const pct = Math.min(100, Math.round((valore / scalaMax) * 100));
+    return `<div class="prvs-pioggia">
+        <span>☂️</span>
+        <div class="prvs-pioggia-track"><div class="prvs-pioggia-fill" style="width:${pct}%; background:${coloreMm(mm)}"></div></div>
+        <span class="prvs-pioggia-mm">${mm !== null && mm !== undefined ? mm + "mm" : "—"}</span>
+    </div>`;
 }
 
 /* ============================================================
@@ -172,8 +213,7 @@ function rigaConcordanza(m1, m2) {
 
 /* Stato della vista esplosa. null = vista normale. */
 let stato = {
-    giornoSelezionato: null,
-    modalitaDettaglio: "fasce"
+    giornoAperto: null
 };
 
 let previsioniCache = null;
@@ -191,12 +231,13 @@ function renderAttuale() {
 }
 
 /* ============================================================
-   VISTA NORMALE — prossime 10 ore + 3 righe giorno
+   PAGINA — striscia ore FISSA (non cambia mai) + 7 righe giorno
+   (oggi + 6 successivi) con accordion inline: click su una riga
+   apre sotto di sé le chip orarie (oggi/domani) o di fascia (gli
+   altri 5 giorni); click su una chip apre il modal di confronto.
    ============================================================ */
-function renderVistaNormale(previsioni) {
-    rimuoviControlliEsplosione();
-    document.getElementById("prvs-label-striscia").textContent = "Prossime ore";
-
+function renderPagina(previsioni) {
+    // --- Striscia "Prossime ore": sempre le stesse 10 ore, mai sostituita ---
     const scroll = document.getElementById("prvs-oggi-scroll");
     scroll.innerHTML = "";
 
@@ -212,222 +253,153 @@ function renderVistaNormale(previsioni) {
                 </div>
                 <div class="prvs-oraria-stats">
                     <div>☂️ ${ora.precip !== null ? ora.precip.toFixed(1) + "mm" : "—"}</div>
-                    ${renderCampiOpzionali(ora)}
+                    <div>💧 ${ora.umidita !== null && ora.umidita !== undefined ? Math.round(ora.umidita) + "%" : "—"}</div>
                 </div>
             </div>
         `;
-        cella.addEventListener("click", () => apriEsplosione(previsioni, ora.data));
         scroll.appendChild(cella);
     }
 
+    // --- 7 righe giorno: oggi + 6 successivi ---
     const contenitore = document.getElementById("prvs-fascia-giorni");
     contenitore.innerHTML = "";
 
-    const inizio = previsioni.indiceInizioRiepilogo;
-    const giorniDaMostrare = previsioni.riepilogoGiorni.slice(inizio, inizio + 3);
+    const giorni = previsioni.riepilogoGiorni.slice(0, 7);
+    for (const [idx, giorno] of giorni.entries()) {
+        const item = creaVoceGiorno(previsioni, giorno, idx);
+        contenitore.appendChild(item);
+    }
 
-    for (const giorno of giorniDaMostrare) {
-        const card = creaCardGiorno(giorno);
-        card.addEventListener("click", () => apriEsplosione(previsioni, giorno.data));
-        contenitore.appendChild(card);
+    // Se un giorno era aperto (es. dopo un cambio di impostazioni), riaprilo
+    if (stato.giornoAperto) {
+        const giorno = giorni.find(g => g.data === stato.giornoAperto);
+        const item = contenitore.querySelector(`[data-data="${stato.giornoAperto}"]`);
+        if (giorno && item) apriGiorno(previsioni, giorno, item);
     }
 }
 
-function creaCardGiorno(giorno) {
-    const card = document.createElement("div");
-    card.className = "prvs-giorno-card";
-    card.innerHTML = `
-        <div class="prvs-giorno-label">${giorno.label}</div>
-        ${iconaPer(giorno.sintesi.categoria, "scuro", 12)}
-        <div class="prvs-giorno-dati">
-            <div class="prvs-giorno-temp-minmax num">
-                <span class="term">🌡️</span>${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}
-                / ${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}
-            </div>
-            <div class="prvs-giorno-pioggia">
-                ☂️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}
-            </div>
+function creaVoceGiorno(previsioni, giorno, idx) {
+    const item = document.createElement("div");
+    item.className = "prvs-giorno-item";
+    item.dataset.data = giorno.data;
+
+    const riga = document.createElement("div");
+    riga.className = "prvs-giorno-card";
+    riga.innerHTML = `
+        <div class="prvs-giorno-icona">${iconaPer(giorno.sintesi.categoria, "chiaro", 12)}</div>
+        <div class="prvs-giorno-testo">
+            <div class="prvs-giorno-label">${giorno.label}<span class="prvs-chevron">⌄</span></div>
+            <div class="prvs-giorno-sky">${categoriaTesto(giorno.sintesi.categoria)}</div>
+            ${tagAllarmi(giorno.allarmi, giorno.mareaMassima)}
         </div>
-        <div class="prvs-badge-riga">${badgeAllarmi(giorno.allarmi, giorno.mareaMassima)}</div>
-    `;
-    return card;
-}
-
-/* ============================================================
-   VISTA ESPLOSA
-   Riga 1: 8 schede giorno (oggi + 7gg), stesso formato delle ore.
-   Sotto: toggle Ore/Fasce + dettaglio del giorno selezionato.
-   ============================================================ */
-function apriEsplosione(previsioni, dataSelezionata) {
-    stato.giornoSelezionato = dataSelezionata;
-    renderVistaEsplosa(previsioni);
-}
-
-function renderVistaEsplosa(previsioni) {
-    document.getElementById("prvs-label-striscia").textContent = "Prossimi giorni";
-
-    // --- Riga 1: 8 schede giorno ---
-    const scroll = document.getElementById("prvs-oggi-scroll");
-    scroll.innerHTML = "";
-
-    for (const [idx, giorno] of previsioni.riepilogoGiorni.entries()) {
-        const cella = document.createElement("div");
-        cella.className = "prvs-oraria-cell";
-        if (giorno.data === stato.giornoSelezionato) cella.classList.add("selezionata");
-
-        // Dal 3° giorno in poi (indice 2+) mostriamo anche la probabilità
-        // di pioggia dal modello globale, oltre ai mm — vedi chat.
-        const rigaOmbrello = idx >= 2 && giorno.sintesi.probPioggiaGenerale !== null
-            ? `<div>☂️ ${giorno.sintesi.probPioggiaGenerale}%</div>`
-            : "";
-
-        cella.innerHTML = `
-            <div class="prvs-ora-testo">${giorno.label}</div>
-            <div class="prvs-oraria-corpo">
-                ${iconaPer(giorno.sintesi.categoria, "chiaro", 12)}
-                <div class="prvs-giorno-temp-maxmin">
-                    <div class="tmax num"><span class="term">🌡️</span>${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}</div>
-                    <div class="tmin num">${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}</div>
-                </div>
-                <div class="prvs-oraria-stats">
-                    <div>☂️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}</div>
-                    ${rigaOmbrello}
-                </div>
+        <div class="prvs-giorno-dati">
+            <div class="prvs-giorno-temp">
+                <span class="max num"><span class="term">🌡️</span>${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}</span>
+                <span class="min num">${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}</span>
             </div>
-            <div class="prvs-badge-riga-fissa">${badgeAllarmi(giorno.allarmi, giorno.mareaMassima)}</div>
-        `;
-        cella.addEventListener("click", () => apriEsplosione(previsioni, giorno.data));
-        scroll.appendChild(cella);
-    }
+            ${pioggiaBar(giorno.sintesi.pioggiaTotale)}
+        </div>
+    `;
+    riga.addEventListener("click", () => toggleGiorno(previsioni, giorno, item));
 
-    // --- Controlli sopra il dettaglio: torna indietro + toggle ore/fasce ---
-    inserisciControlliEsplosione(previsioni);
+    const espansione = document.createElement("div");
+    espansione.className = "prvs-giorno-espansione";
 
-    // --- Dettaglio del giorno selezionato ---
-    const giorno = previsioni.riepilogoGiorni.find(g => g.data === stato.giornoSelezionato);
-    const contenitore = document.getElementById("prvs-fascia-giorni");
-    contenitore.innerHTML = "";
+    item.appendChild(riga);
+    item.appendChild(espansione);
+    return item;
+}
 
-    if (!giorno) return;
+function toggleGiorno(previsioni, giorno, item) {
+    const giaAperto = item.classList.contains("aperto");
 
-    if (stato.modalitaDettaglio === "fasce") {
-        for (const fascia of giorno.fasceGiorno) {
-            const arpae = fascia.modelli.arpae || null;
-            const ecmwf = fascia.modelli.ecmwf || null;
-            const seamless = fascia.modelli.icon || null;
-            // Rappresentativo per la card: ARPAE se c'è (giorni 1-3), altrimenti ECMWF
-            const rappresentativo = arpae || ecmwf;
-            // Confronto per i pallini: ARPAE-vs-ECMWF finché disponibile,
-            // altrimenti ECMWF-vs-Seamless (mai lo stesso modello con se stesso)
-            const confrontoA = arpae || ecmwf;
-            const confrontoB = arpae ? ecmwf : seamless;
-            const oraRappresentativa = ORA_RAPPRESENTATIVA_FASCIA[fascia.fascia];
-            const card = document.createElement("div");
-            card.className = "prvs-giorno-card";
-            card.innerHTML = `
-                <div class="prvs-giorno-label">${fascia.label}</div>
-                <div class="prvs-giorno-icona-temp">
-                    ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "scuro", oraRappresentativa)}
-                    <div class="prvs-giorno-temp-grande num"><span class="term">🌡️</span>${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
-                </div>
-                <div class="prvs-giorno-dati-destra">
-                    ☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}
-                </div>
-                ${rigaConcordanza(confrontoA, confrontoB)}
-                <div class="prvs-badge-riga">${badgeAllarmi(fascia.allarmi)}</div>
-            `;
-            card.addEventListener("click", () =>
-                apriDettaglioConfronto(`${fascia.label} — ${giorno.label}`, arpae, ecmwf, seamless)
-            );
-            contenitore.appendChild(card);
-        }
-    } else {
-        // Modalità "ore": se il giorno è oggi, solo le ore da adesso in poi.
-        // Niente badge allarmi qui: il weathercode orario è già chiaro,
-        // gli allarmi servono per farsi un'idea rapida su giorno/fascia.
+    document.querySelectorAll(".prvs-giorno-item.aperto").forEach(el => {
+        el.classList.remove("aperto");
+        const esp = el.querySelector(".prvs-giorno-espansione");
+        if (esp) esp.innerHTML = "";
+    });
+    stato.giornoAperto = null;
+
+    if (!giaAperto) apriGiorno(previsioni, giorno, item);
+}
+
+/* Oggi e domani (indice 0-1) → chip orarie (24, o quelle residue per
+   oggi). Dal 3° giorno in poi (indice 2+, oltre l'orizzonte ARPAE
+   delle 72h) → chip di fascia (mattina/pomeriggio/sera/notte). */
+function apriGiorno(previsioni, giorno, item) {
+    item.classList.add("aperto");
+    stato.giornoAperto = giorno.data;
+
+    const idx = previsioni.riepilogoGiorni.findIndex(g => g.data === giorno.data);
+    const usaOre = idx <= 1;
+    const espansione = item.querySelector(".prvs-giorno-espansione");
+    const scroll = document.createElement("div");
+    scroll.className = "prvs-slot-scroll";
+    espansione.appendChild(scroll);
+    const dettaglio = document.createElement("div");
+    espansione.appendChild(dettaglio);
+
+    const seleziona = (chip, titolo, arpae, ecmwf, seamless, confrontoA, confrontoB) => {
+        scroll.querySelectorAll(".prvs-slot-chip").forEach(c => c.classList.remove("selezionata"));
+        chip.classList.add("selezionata");
+        mostraConfrontoInline(dettaglio, titolo, arpae, ecmwf, seamless, confrontoA, confrontoB);
+    };
+
+    if (usaOre) {
         let oreDaMostrare = giorno.oreDettaglio;
         if (giorno.data === previsioni.oggiStr) {
             const oraCorrente = new Date().getHours();
             oreDaMostrare = oreDaMostrare.filter(o => o.ora >= oraCorrente);
         }
-
         for (const oraDett of oreDaMostrare) {
             const arpae = oraDett.modelli.arpae || null;
             const ecmwf = oraDett.modelli.ecmwf || null;
             const seamless = oraDett.modelli.icon || null;
             const rappresentativo = arpae || ecmwf;
-            const confrontoA = arpae || ecmwf;
-            const confrontoB = arpae ? ecmwf : seamless;
-            const card = document.createElement("div");
-            card.className = "prvs-giorno-card";
-            card.innerHTML = `
-                <div class="prvs-giorno-label">${String(oraDett.ora).padStart(2, "0")}:00</div>
-                <div class="prvs-giorno-icona-temp">
-                    ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "scuro", oraDett.ora)}
-                    <div class="prvs-giorno-temp-grande num"><span class="term">🌡️</span>${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
-                </div>
-                <div class="prvs-oraria-stats-scuro">
-                    ${renderCampiOpzionali({ ...rappresentativo, marea: oraDett.marea })}
-                </div>
-                <div class="prvs-giorno-dati-destra">
-                    ☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}
-                </div>
-                ${rigaConcordanza(confrontoA, confrontoB)}
+            const chip = document.createElement("div");
+            chip.className = "prvs-slot-chip";
+            chip.innerHTML = `
+                <div class="prvs-slot-h">${String(oraDett.ora).padStart(2, "0")}:00</div>
+                ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "chiaro", oraDett.ora)}
+                <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
+                <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
             `;
-            card.addEventListener("click", () =>
-                apriDettaglioConfronto(`Ore ${String(oraDett.ora).padStart(2, "0")}:00 — ${giorno.label}`, arpae, ecmwf, seamless)
-            );
-            contenitore.appendChild(card);
+            chip.addEventListener("click", () => {
+                const confrontoA = arpae || ecmwf;
+                const confrontoB = arpae ? ecmwf : seamless;
+                seleziona(chip, `Ore ${String(oraDett.ora).padStart(2, "0")}:00`, arpae, ecmwf, seamless, confrontoA, confrontoB);
+            });
+            scroll.appendChild(chip);
+        }
+    } else {
+        for (const fascia of giorno.fasceGiorno) {
+            const arpae = fascia.modelli.arpae || null;
+            const ecmwf = fascia.modelli.ecmwf || null;
+            const seamless = fascia.modelli.icon || null;
+            const rappresentativo = arpae || ecmwf;
+            const oraRappresentativa = ORA_RAPPRESENTATIVA_FASCIA[fascia.fascia];
+            const chip = document.createElement("div");
+            chip.className = "prvs-slot-chip";
+            chip.innerHTML = `
+                <div class="prvs-slot-h">${fascia.label}</div>
+                ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "chiaro", oraRappresentativa)}
+                <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
+                <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
+            `;
+            chip.addEventListener("click", () => {
+                const confrontoA = arpae || ecmwf;
+                const confrontoB = arpae ? ecmwf : seamless;
+                seleziona(chip, fascia.label, arpae, ecmwf, seamless, confrontoA, confrontoB);
+            });
+            scroll.appendChild(chip);
         }
     }
 }
 
-/* Controlli sopra il dettaglio: link "torna" + toggle Ore/Fasce. */
-function inserisciControlliEsplosione(previsioni) {
-    rimuoviControlliEsplosione();
-
-    const barra = document.createElement("div");
-    barra.id = "prvs-controlli-esplosione";
-    barra.className = "prvs-controlli-esplosione";
-    barra.innerHTML = `
-        <span class="prvs-torna">← Torna</span>
-        <div class="prvs-toggle">
-            <button class="prvs-toggle-btn" data-modo="fasce">Fasce</button>
-            <button class="prvs-toggle-btn" data-modo="ore">Ore</button>
-        </div>
-    `;
-
-    barra.querySelector(".prvs-torna").addEventListener("click", () => {
-        stato.giornoSelezionato = null;
-        renderVistaNormale(previsioni);
-    });
-
-    barra.querySelectorAll(".prvs-toggle-btn").forEach(btn => {
-        if (btn.dataset.modo === stato.modalitaDettaglio) btn.classList.add("attivo");
-        btn.addEventListener("click", () => {
-            stato.modalitaDettaglio = btn.dataset.modo;
-            renderVistaEsplosa(previsioni);
-        });
-    });
-
-    const contenitore = document.getElementById("prvs-fascia-giorni");
-    contenitore.parentNode.insertBefore(barra, contenitore);
-}
-
-function rimuoviControlliEsplosione() {
-    const esistente = document.getElementById("prvs-controlli-esplosione");
-    if (esistente) esistente.remove();
-}
-
 /* ============================================================
-   MODAL — confronto tra i 2 modelli per una singola voce
-   (fascia o ora), aperto dal secondo livello di esplosione.
+   CONFRONTO TRA MODELLI — pannello inline sotto le chip
+   selezionate (non più un modal a pagina intera).
    ============================================================ */
-const modal = document.getElementById("prvs-modal");
-const modalClose = document.getElementById("prvs-modal-close");
-
-modalClose.onclick = () => modal.style.display = "none";
-modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; };
 
 /* Formatta un valore per la tabella: "n.d." se il modello manca del
    tutto o se il campo specifico è null/undefined — mai un errore JS
@@ -440,12 +412,7 @@ function formattaValore(modello, campo, unita, arrotonda = false) {
     return (arrotonda ? Math.round(v) : v) + unita;
 }
 
-function apriDettaglioConfronto(titolo, arpae, ecmwf, seamless) {
-    document.getElementById("prvs-modal-title").textContent = titolo;
-
-    const body = document.getElementById("prvs-modal-body");
-    body.innerHTML = "";
-
+function mostraConfrontoInline(container, titolo, arpae, ecmwf, seamless, confrontoA, confrontoB) {
     const riga = (etichetta, campo, unita, arrotonda = false) => `
         <tr>
             <td>${etichetta}</td>
@@ -454,32 +421,36 @@ function apriDettaglioConfronto(titolo, arpae, ecmwf, seamless) {
             <td>${formattaValore(seamless, campo, unita, arrotonda)}</td>
         </tr>
     `;
-
-    const tabella = document.createElement("table");
-    tabella.className = "prvs-table-oraria";
-    tabella.innerHTML = `
-        <thead>
-            <tr>
-                <th>Voce</th>
-                <th>ARPAE</th>
-                <th>ECMWF</th>
-                <th>Seamless</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${riga("Temperatura", "temp", "°")}
-            ${riga("Percepita", "percepita", "°")}
-            ${riga("Umidità", "umidita", "%")}
-            ${riga("Pioggia", "precip", "mm")}
-            ${riga("Vento", "vento", "km/h", true)}
-            ${riga("Pressione", "pressione", "hPa", true)}
-            ${riga("CIN", "cin", " J/kg")}
-            ${riga("Neve", "neve", "cm")}
-        </tbody>
+    const tagModelli = arpae ? "ARPAE · ECMWF · Seamless" : "ECMWF · Seamless";
+    container.innerHTML = `
+        <div class="prvs-slot-dettaglio">
+            <div class="prvs-slot-dettaglio-head">
+                <span class="prvs-slot-dettaglio-title">Confronto — ${titolo}</span>
+                <span class="prvs-slot-dettaglio-tag">${tagModelli}</span>
+            </div>
+            <table class="prvs-table-oraria">
+                <thead>
+                    <tr>
+                        <th>Voce</th>
+                        <th>ARPAE</th>
+                        <th>ECMWF</th>
+                        <th>Seamless</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${riga("Temperatura", "temp", "°")}
+                    ${riga("Percepita", "percepita", "°")}
+                    ${riga("Umidità", "umidita", "%")}
+                    ${riga("Pioggia", "precip", "mm")}
+                    ${riga("Vento", "vento", "km/h", true)}
+                    ${riga("Pressione", "pressione", "hPa", true)}
+                    ${riga("CIN", "cin", " J/kg")}
+                    ${riga("Neve", "neve", "cm")}
+                </tbody>
+            </table>
+            ${rigaConcordanza(confrontoA, confrontoB)}
+        </div>
     `;
-
-    body.appendChild(tabella);
-    modal.style.display = "flex";
 }
 
 /* ============================================================
@@ -557,8 +528,7 @@ document.getElementById("prvs-btn-salva-impostazioni").addEventListener("click",
     // la sintesi (istantaneo) e ridisegniamo la vista corrente.
     if (previsioniCache) {
         previsioniCache = PrevisioniData.ricalcolaPrevisioni() || previsioniCache;
-        if (stato.giornoSelezionato) renderVistaEsplosa(previsioniCache);
-        else renderVistaNormale(previsioniCache);
+        renderPagina(previsioniCache);
     }
 });
 
@@ -570,7 +540,7 @@ async function init() {
     PrevisioniData.impostaPreferenzaModello(preferenze.modelloPrincipale);
     try {
         previsioniCache = await PrevisioniData.ottieniPrevisioni();
-        renderVistaNormale(previsioniCache);
+        renderPagina(previsioniCache);
     } catch (errore) {
         console.error("Errore nel caricamento delle previsioni:", errore);
         document.getElementById("prvs-oggi-scroll").innerHTML =

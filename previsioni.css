@@ -324,88 +324,113 @@ body {
     font-weight: normal;
 }
 
-/* Righe giorno (fascia 3): card chiare, coerenti con la striscia ore */
+/* Riga giorno: griglia icona | testo | dati, come nella shell.
+   Il "contenitore card" ora è #prvs-fascia-giorni (un'unica card
+   con righe separate da linee sottili), non più ogni riga per sé. */
 .prvs-giorno-card {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    column-gap: 12px;
     align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.1rem;
-    margin: 0 1rem 10px;
-    border-radius: 16px;
+    padding: 14px 0;
     cursor: pointer;
-    background: var(--carta);
+    background: transparent;
     color: var(--inchiostro);
-    box-shadow: var(--ombra);
 }
 
 .prvs-giorno-card:active {
-    filter: brightness(0.97);
+    background: rgba(16,38,43,0.03);
 }
+
+.prvs-giorno-icona {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.prvs-giorno-icona img { width: 34px; }
+
+.prvs-giorno-testo { min-width: 0; }
 
 .prvs-giorno-label {
     font-weight: 700;
-    font-size: 0.98rem;
-    flex: 1;
+    font-size: 0.95rem;
     color: var(--inchiostro);
-}
-
-.prvs-giorno-temp-max {
-    font-size: 1.3rem;
-    font-weight: 700;
-    min-width: 50px;
-    text-align: right;
-}
-
-.prvs-giorno-dati {
-    text-align: right;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 90px;
-}
-
-.prvs-giorno-temp-minmax {
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 1.05rem;
-    font-weight: 700;
-    white-space: nowrap;
-    color: var(--inchiostro);
-}
-
-.prvs-giorno-pioggia {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--inchiostro-soft);
-    white-space: nowrap;
-}
-
-/* Righe fascia/ora nel dettaglio esploso: icona+temperatura
-   raggruppate a sinistra (più prominenti), dati residui a destra */
-.prvs-giorno-icona-temp {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
-.prvs-giorno-temp-grande {
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 1.55rem;
+.prvs-giorno-sky {
+    font-size: 0.82rem;
     font-weight: 700;
-    white-space: nowrap;
+    color: var(--inchiostro-soft);
+    margin-top: 2px;
+    line-height: 1.3;
+}
+
+.prvs-tag-allarme {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    padding: 2px 8px;
+    border-radius: 20px;
+    color: #fff;
+    margin: 6px 4px 0 0;
+}
+.prvs-tag-temporale  { background: var(--nizioleto); }
+.prvs-tag-nebbia     { background: var(--inchiostro-soft); }
+.prvs-tag-acqua-alta { background: var(--acqua); }
+
+.prvs-giorno-dati {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.prvs-giorno-temp {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+.prvs-giorno-temp .max {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
     color: var(--inchiostro);
     display: inline-flex;
     align-items: center;
     gap: 3px;
 }
-.prvs-giorno-temp-grande .term { font-size: 0.85rem; }
+.prvs-giorno-temp .max .term { font-size: 0.68rem; }
+.prvs-giorno-temp .min {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--inchiostro-soft);
+}
 
-.prvs-giorno-dati-destra {
-    font-size: 0.85rem;
+/* Barra pioggia: come nell'idrometro marea, stesso linguaggio visivo */
+.prvs-pioggia {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.prvs-pioggia-track {
+    width: 30px;
+    height: 6px;
+    border-radius: 4px;
+    background: rgba(16,38,43,0.08);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.prvs-pioggia-fill { height: 100%; border-radius: 4px; }
+.prvs-pioggia-mm {
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--inchiostro-soft);
     white-space: nowrap;
-    text-align: right;
 }
 
 /* Le icone meteo non hanno più un cerchietto colorato di sfondo:
@@ -418,10 +443,6 @@ body {
     box-shadow: none;
 }
 .prvs-icona-badge img { width: 44px !important; }
-.prvs-oraria-corpo > img,
-.prvs-giorno-icona-temp > img {
-    width: 40px;
-}
 
 /* Scheda giorno selezionata nella vista esplosa */
 .prvs-oraria-cell.selezionata {
@@ -429,45 +450,123 @@ body {
     background: var(--cielo);
 }
 
-/* Barra controlli vista esplosa: torna indietro + toggle ore/fasce */
-.prvs-controlli-esplosione {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.7rem 1rem;
-    background: transparent;
-    border-bottom: none;
-}
-
-.prvs-torna {
-    color: var(--inchiostro);
-    font-weight: 700;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.prvs-toggle {
-    display: flex;
-    border: 1px solid var(--linea);
+/* ============================================================
+   ACCORDION GIORNI — un'unica card con righe separate da linee
+   sottili (non più una card staccata per ogni giorno); ogni riga
+   sempre visibile + espansione inline con chip orarie/di fascia.
+   ============================================================ */
+#prvs-fascia-giorni {
     background: var(--carta);
     border-radius: 20px;
-    overflow: hidden;
+    margin: 0 1rem 14px;
+    padding: 4px 16px;
     box-shadow: var(--ombra);
 }
 
-.prvs-toggle-btn {
-    border: none;
-    background: transparent;
+.prvs-giorno-item {
+    border-bottom: 1px solid var(--linea);
+}
+.prvs-giorno-item:last-child { border-bottom: none; }
+
+.prvs-chevron {
+    display: inline-block;
+    font-size: 0.7rem;
     color: var(--inchiostro-soft);
-    padding: 0.35rem 0.9rem;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
+    margin-left: 5px;
+    transition: transform .2s ease;
+}
+.prvs-giorno-item.aperto .prvs-chevron { transform: rotate(180deg); }
+
+.prvs-giorno-espansione {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height .25s ease, opacity .2s ease;
+}
+.prvs-giorno-item.aperto .prvs-giorno-espansione {
+    max-height: 600px;
+    opacity: 1;
+    border-top: 1px solid var(--linea);
 }
 
-.prvs-toggle-btn.attivo {
-    background: var(--inchiostro);
+.prvs-slot-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 12px 14px;
+    scroll-snap-type: x mandatory;
+}
+.prvs-slot-scroll::-webkit-scrollbar { display: none; }
+
+.prvs-slot-chip {
+    background: var(--cielo);
+    border: 1px solid var(--linea);
+    border-radius: 14px;
+    padding: 10px 10px;
+    min-width: 76px;
+    flex-shrink: 0;
+    text-align: center;
+    cursor: pointer;
+    scroll-snap-align: start;
+}
+.prvs-slot-chip:active { filter: brightness(0.97); }
+
+.prvs-slot-h {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: var(--inchiostro-soft);
+}
+.prvs-slot-chip img { width: 28px; margin: 5px 0 3px; }
+.prvs-slot-t {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--inchiostro);
+}
+.prvs-slot-mm {
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: var(--inchiostro-soft);
+    margin-top: 3px;
+}
+.prvs-slot-chip.selezionata { background: var(--inchiostro); border-color: var(--inchiostro); }
+.prvs-slot-chip.selezionata .prvs-slot-h,
+.prvs-slot-chip.selezionata .prvs-slot-t,
+.prvs-slot-chip.selezionata .prvs-slot-mm { color: #fff; }
+
+/* Confronto tra i 3 modelli: ora inline sotto le chip selezionate,
+   non più in un modal a pagina intera */
+.prvs-slot-dettaglio {
+    margin: 0 14px 16px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--linea);
+}
+.prvs-slot-dettaglio-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.prvs-slot-dettaglio-tag {
+    font-size: 0.65rem;
+    letter-spacing: .03em;
+    color: var(--inchiostro-soft);
+}
+.prvs-slot-dettaglio-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: .03em;
     color: #fff;
+    background: var(--nizioleto);
+    padding: 5px 10px 4px;
+    border-radius: 4px;
+    text-transform: uppercase;
 }
 
 /* Slot allerta acqua alta: pallino/icona di avviso accanto alla temperatura */

@@ -30,9 +30,10 @@
         </div>
     </section>
 
-    <!-- FASCIA 3 — Riepilogo giorni successivi (tap per dettaglio) -->
+    <!-- FASCIA 3 — 7 righe: oggi + 6 giorni successivi, ciascuna con accordion inline -->
+    <div class="prvs-label">Prossimi giorni</div>
     <section class="prvs-fascia" id="prvs-fascia-giorni">
-        <!-- Una .prvs-giorno-card per ogni giorno, generata da JS -->
+        <!-- Una .prvs-giorno-item per ogni giorno, generata da JS -->
     </section>
 
     <!-- FASCIA 4 — Link esterni -->
@@ -50,19 +51,6 @@
     </section>
 
 </main>
-
-<!-- MODAL DETTAGLIO GIORNO (struttura pronta, contenuto nel prossimo passo) -->
-<div id="prvs-modal" class="prvs-modal-backdrop">
-    <div class="prvs-modal">
-        <div class="prvs-modal-header">
-            <h3 id="prvs-modal-title">Dettaglio</h3>
-            <span id="prvs-modal-close" class="prvs-modal-close">&times;</span>
-        </div>
-        <div id="prvs-modal-body">
-            <!-- Tabella fasce/modelli: la costruiamo nel prossimo passo -->
-        </div>
-    </div>
-</div>
 
 <!-- MODAL IMPOSTAZIONI -->
 <div id="prvs-modal-impostazioni" class="prvs-modal-backdrop">
