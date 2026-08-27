@@ -1,17 +1,41 @@
 :root {
-    --blu: #0b6fa4;
-    --turchese: #1fb5c9;
-    --sfondo: #f5f7fb;
-    --bordo: #d0e4f5;
-    --grigio: #444;
+    /* ===== Token "idrometro" — direzione grafica concordata in chat =====
+       Sostituiscono il vecchio blu/turchese: sfondo chiaro, ink scuro,
+       accenti legati al mondo lagunare (nizioleti, bricole, marea). */
+    --cielo: #EEF4F3;        /* sfondo pagina */
+    --carta: #FFFFFF;        /* sfondo card */
+    --inchiostro: #10262B;   /* testo primario */
+    --inchiostro-soft: #5C7278;
+    --nizioleto: #A23E2C;    /* rosso ossido — accento firma, allerta forte */
+    --acqua: #2E7C86;        /* pioggia/marea normale */
+    --bricola: #B8894C;      /* legno/bricola — neutro caldo */
+    --sole: #E7A93E;         /* allerta media */
+    --acqua-soft: #5C9AA1;   /* varianti meno intense per il grafico marea */
+    --sole-soft: #D9AE5E;
+    --nizioleto-soft: #B5594A;
+    --bricola-soft: #C7A576;
+    --linea: rgba(16,38,43,0.10);
+    --ombra: 0 1px 2px rgba(16,38,43,0.06), 0 6px 18px rgba(16,38,43,0.07);
+
+    /* alias per compatibilità con i nomi vecchi usati altrove nel CSS */
+    --blu: var(--inchiostro);
+    --turchese: var(--acqua);
+    --sfondo: var(--cielo);
+    --bordo: var(--linea);
+    --grigio: var(--inchiostro-soft);
 }
 
 body {
     margin: 0;
     background: var(--sfondo);
-    font-family: system-ui, sans-serif;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
     color: var(--grigio);
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
 }
+
+.num { font-family: "Space Grotesk", sans-serif; font-variant-numeric: tabular-nums; }
 
 /* HEADER */
 .prvs-header {
@@ -28,17 +52,22 @@ body {
 }
 
 .prvs-label {
-    font-size: 1.1rem;
-    color: var(--blu);
-    margin-bottom: 0.4rem;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--inchiostro-soft);
+    margin: 1.4rem 0 0.6rem;
+    padding: 0 1rem;
 }
 
 /* RIGA ORARIA SCORREVOLE */
 .prvs-oraria-scroll {
     display: flex;
     overflow-x: auto;
-    gap: 8px;
-    padding: 8px 0;
+    gap: 10px;
+    padding: 4px 1rem 10px;
     scroll-snap-type: x mandatory;
 }
 
@@ -47,22 +76,25 @@ body {
 }
 
 .prvs-oraria-cell {
-    min-width: 140px;
-    background: #f7fafc;
-    border-radius: 8px;
-    padding: 8px 10px;
+    min-width: 148px;
+    background: var(--carta);
+    border-radius: 16px;
+    padding: 12px 14px;
     text-align: left;
     scroll-snap-align: start;
-    border: 1px solid var(--bordo);
+    border: none;
+    box-shadow: var(--ombra);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
 }
 
 .prvs-ora-testo {
-    font-weight: 600;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
     font-size: 0.85rem;
     text-align: center;
+    color: var(--inchiostro-soft);
 }
 
 /* Corpo orizzontale: icona a sinistra, temperatura al centro,
@@ -78,48 +110,55 @@ body {
 .prvs-oraria-icona-temp {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
 }
 
 .prvs-ora-temp-grande {
-    font-size: 1.4rem;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.5rem;
     font-weight: 700;
     min-width: 44px;
     text-align: center;
+    color: var(--inchiostro);
+    display: flex;
+    align-items: center;
+    gap: 3px;
 }
+.prvs-ora-temp-grande .term { font-size: 0.85rem; }
 
-/* Max/min ravvicinate nelle schede giorno (striscia esplosa) */
-.prvs-giorno-temp-maxmin {
-    font-size: 1.25rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-/* Max/min impilate (non più affiancate: andavano oltre il bordo
-   scheda) nelle schede giorno della striscia esplosa */
+/* Max/min impilate nelle schede giorno della striscia esplosa */
 .prvs-giorno-temp-maxmin {
     display: flex;
     flex-direction: column;
     align-items: center;
     line-height: 1.15;
+    font-family: "Space Grotesk", sans-serif;
 }
 
 .prvs-giorno-temp-maxmin .tmax {
-    font-size: 1.15rem;
+    font-size: 1.2rem;
     font-weight: 700;
+    color: var(--inchiostro);
+    display: flex;
+    align-items: center;
+    gap: 3px;
 }
+.prvs-giorno-temp-maxmin .tmax .term { font-size: 0.72rem; }
 
 .prvs-giorno-temp-maxmin .tmin {
     font-size: 0.85rem;
     font-weight: 600;
-    opacity: 0.75;
+    color: var(--inchiostro-soft);
+    opacity: 1;
 }
 
 .prvs-oraria-stats {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    font-size: 0.68rem;
+    gap: 3px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--inchiostro-soft);
     line-height: 1.3;
     white-space: nowrap;
     flex: 1;
@@ -138,17 +177,19 @@ body {
     width: 48%;
     padding: 0.7rem;
     margin: 0.4rem 1%;
-    background: var(--blu);
+    background: var(--nizioleto);
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
 }
 
 .prvs-btn-indietro {
     width: 100%;
     padding: 0.7rem;
-    background: var(--turchese);
+    background: var(--acqua);
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -171,110 +212,142 @@ body {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.4);
+    background: rgba(16,38,43,0.45);
     justify-content: center;
     align-items: center;
 }
 
 .prvs-modal {
-    background: #fff;
+    background: var(--carta);
+    color: var(--inchiostro);
     width: 95%;
     max-width: 600px;
     max-height: 80vh;
     overflow-y: auto;
-    border-radius: 12px;
-    padding: 1rem;
+    border-radius: 18px;
+    padding: 1.1rem;
 }
 
 .prvs-modal-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
+}
+.prvs-modal-header h3 {
+    font-family: "Space Grotesk", sans-serif;
+    display: inline-flex; align-items: center; gap: 7px;
+    font-weight: 700; font-size: 0.85rem; letter-spacing: .02em;
+    color: #fff; background: var(--nizioleto);
+    padding: 5px 10px 4px; border-radius: 4px; text-transform: uppercase;
+    margin: 0;
 }
 
 .prvs-modal-close {
     font-size: 1.4rem;
     cursor: pointer;
+    color: var(--inchiostro-soft);
 }
 
 /* ============================================================
-   NUOVA STRUTTURA A FASCE ORIZZONTALI
+   FASCE ORIZZONTALI
    ============================================================ */
 
 .prvs-fascia {
     padding: 0.9rem 1rem;
-    border-bottom: 1px solid var(--bordo);
-    background: #fff;
+    border-bottom: none;
+    background: transparent;
 }
 
 .prvs-fascia-header {
-    background: linear-gradient(135deg, var(--blu), var(--turchese));
-    color: #fff;
-    text-align: center;
-    padding: 1.2rem 1rem;
+    background: transparent;
+    color: var(--inchiostro);
+    text-align: left;
+    padding: 1.5rem 1rem 0.4rem;
     position: relative;
 }
 
 .prvs-btn-impostazioni {
     position: absolute;
-    top: 0.7rem;
-    right: 0.8rem;
-    background: rgba(255,255,255,0.15);
+    top: 1.6rem;
+    right: 1rem;
+    background: var(--carta);
+    box-shadow: var(--ombra);
     border: none;
     border-radius: 50%;
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
     font-size: 1.1rem;
     cursor: pointer;
-    color: #fff;
+    color: var(--inchiostro);
 }
 
 .prvs-fascia-header h1 {
-    margin: 0 0 0.2rem 0;
-    font-size: 1.4rem;
+    margin: 0.6rem 0 0.2rem 0;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 1.7rem;
+    letter-spacing: -.01em;
+    color: var(--inchiostro);
 }
 
 .prvs-luogo {
-    font-size: 0.95rem;
-    opacity: 0.9;
+    font-size: 0.9rem;
+    color: var(--inchiostro-soft);
     margin-bottom: 0.6rem;
+}
+.prvs-luogo::before {
+    content: "Venezia & Laguna";
+    display: inline-block;
+    background: var(--nizioleto);
+    color: #fff;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 0.65rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    padding: 4px 9px 3px;
+    border-radius: 4px;
+    margin-bottom: 8px;
 }
 
 .prvs-attuale {
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--inchiostro);
 }
 
 .prvs-attuale-caricamento,
 .prvs-caricamento {
     font-size: 0.9rem;
-    opacity: 0.7;
+    color: var(--inchiostro-soft);
     font-weight: normal;
 }
 
-/* Righe giorno (fascia 3): più alte, sfondo blu scuro per far
-   risaltare le icone chiare (bianco/nuvole che sparivano sul bianco) */
+/* Righe giorno (fascia 3): card chiare, coerenti con la striscia ore */
 .prvs-giorno-card {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    padding: 1.1rem 1rem;
-    margin-bottom: 6px;
-    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    margin: 0 1rem 10px;
+    border-radius: 16px;
     cursor: pointer;
-    background: linear-gradient(135deg, var(--blu), var(--turchese));
-    color: #fff;
+    background: var(--carta);
+    color: var(--inchiostro);
+    box-shadow: var(--ombra);
 }
 
 .prvs-giorno-card:active {
-    filter: brightness(0.92);
+    filter: brightness(0.97);
 }
 
 .prvs-giorno-label {
-    font-weight: 600;
-    font-size: 1rem;
+    font-weight: 700;
+    font-size: 0.98rem;
     flex: 1;
+    color: var(--inchiostro);
 }
 
 .prvs-giorno-temp-max {
@@ -288,19 +361,22 @@ body {
     text-align: right;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     min-width: 90px;
 }
 
 .prvs-giorno-temp-minmax {
+    font-family: "Space Grotesk", sans-serif;
     font-size: 1.05rem;
     font-weight: 700;
     white-space: nowrap;
+    color: var(--inchiostro);
 }
 
 .prvs-giorno-pioggia {
-    font-size: 0.85rem;
-    opacity: 0.9;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--inchiostro-soft);
     white-space: nowrap;
 }
 
@@ -309,39 +385,48 @@ body {
 .prvs-giorno-icona-temp {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 
 .prvs-giorno-temp-grande {
-    font-size: 1.5rem;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.55rem;
     font-weight: 700;
     white-space: nowrap;
+    color: var(--inchiostro);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }
+.prvs-giorno-temp-grande .term { font-size: 0.85rem; }
 
 .prvs-giorno-dati-destra {
     font-size: 0.85rem;
-    opacity: 0.9;
+    font-weight: 600;
+    color: var(--inchiostro-soft);
     white-space: nowrap;
     text-align: right;
 }
 
-/* Badge colorato dietro le icone meteo: senza, nuvole/pioggia chiare
-   sparivano sullo sfondo chiaro delle schede orarie. */
+/* Le icone meteo non hanno più un cerchietto colorato di sfondo:
+   restano "nude", più grandi, per restare leggibili anche piccole. */
 .prvs-icona-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #4a9fc7 0%, #2f7fa8 100%);
-    box-shadow: inset 0 0 4px rgba(0,0,0,0.15);
+    background: none;
+    box-shadow: none;
+}
+.prvs-icona-badge img { width: 44px !important; }
+.prvs-oraria-corpo > img,
+.prvs-giorno-icona-temp > img {
+    width: 40px;
 }
 
 /* Scheda giorno selezionata nella vista esplosa */
 .prvs-oraria-cell.selezionata {
-    border: 2px solid var(--blu);
-    background: #cfe8f3;
+    border: 2px solid var(--nizioleto);
+    background: var(--cielo);
 }
 
 /* Barra controlli vista esplosa: torna indietro + toggle ore/fasce */
@@ -349,48 +434,50 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.6rem 1rem;
-    background: #fff;
-    border-bottom: 1px solid var(--bordo);
+    padding: 0.7rem 1rem;
+    background: transparent;
+    border-bottom: none;
 }
 
 .prvs-torna {
-    color: var(--blu);
-    font-weight: 600;
+    color: var(--inchiostro);
+    font-weight: 700;
     cursor: pointer;
+    font-size: 0.9rem;
 }
 
 .prvs-toggle {
     display: flex;
-    border: 1px solid var(--blu);
+    border: 1px solid var(--linea);
+    background: var(--carta);
     border-radius: 20px;
     overflow: hidden;
+    box-shadow: var(--ombra);
 }
 
 .prvs-toggle-btn {
     border: none;
-    background: #fff;
-    color: var(--blu);
-    padding: 0.3rem 0.9rem;
-    font-size: 0.85rem;
+    background: transparent;
+    color: var(--inchiostro-soft);
+    padding: 0.35rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 700;
     cursor: pointer;
 }
 
 .prvs-toggle-btn.attivo {
-    background: var(--blu);
+    background: var(--inchiostro);
     color: #fff;
 }
 
-/* Slot allerta acqua alta: per ora vuoto/invisibile finché non
-   colleghiamo la fonte dati marea. Quando attivo, mostrerà un
-   pallino/icona di avviso qui accanto alla temperatura. */
+/* Slot allerta acqua alta: pallino/icona di avviso accanto alla temperatura */
 .prvs-giorno-allerta {
     width: 18px;
     min-width: 18px;
 }
 
 .prvs-giorno-allerta:not(:empty) {
-    color: #ffcc00;
+    color: var(--sole);
     font-size: 1.2rem;
 }
 
@@ -407,48 +494,60 @@ body {
 }
 
 .prvs-link-esterno {
-    color: var(--blu);
+    color: var(--inchiostro);
     text-decoration: none;
-    font-size: 0.9rem;
-    padding: 0.5rem;
-    border: 1px solid var(--bordo);
-    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 0.6rem;
+    background: var(--carta);
+    border: none;
+    box-shadow: var(--ombra);
+    border-radius: 12px;
 }
 
-/* TABELLA ORARIA */
+/* TABELLA ORARIA (modal confronto modelli) */
 .prvs-table-oraria {
     width: 100%;
     border-collapse: collapse;
+    font-family: "Space Grotesk", sans-serif;
 }
 
 .prvs-table-oraria th,
 .prvs-table-oraria td {
-    border: 1px solid var(--bordo);
-    padding: 0.25rem 0.2rem;
-    font-size: 0.72rem;
+    border: none;
+    border-bottom: 1px solid var(--linea);
+    padding: 0.45rem 0.3rem;
+    font-size: 0.78rem;
     text-align: center;
+    color: var(--inchiostro);
+}
+.prvs-table-oraria th {
+    color: var(--inchiostro-soft);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
 }
 
 .prvs-table-oraria td:first-child {
     text-align: left;
-    font-weight: 600;
+    font-weight: 700;
+    font-family: -apple-system, sans-serif;
 }
 /* ============================================================
    BADGE ALLARMI — solo su giorni/fasce (temporale forte, nebbia
-   persistente, acqua alta). Sfondo bianco pieno dietro l'emoji:
-   sul gradiente blu i soli colori dell'emoji si notavano poco.
+   persistente, acqua alta).
    ============================================================ */
 .prvs-badge-riga {
     display: flex;
     gap: 6px;
-    margin-top: 4px;
+    margin-top: 6px;
     width: 100%;
     justify-content: flex-end;
 }
 
 /* Versione a riga fissa: mantiene sempre lo stesso spazio anche
-   quando è vuota, così una scheda con allerta non "stira" (per via
-   dello stretch del flexbox) tutte le altre della striscia scorrevole */
+   quando è vuota, così una scheda con allerta non "stira" tutte
+   le altre della striscia scorrevole */
 .prvs-badge-riga-fissa {
     display: flex;
     gap: 6px;
@@ -458,51 +557,63 @@ body {
 }
 
 .prvs-badge-allarme {
-    font-size: 1.3rem;
-    background: #fff;
+    font-size: 1.15rem;
+    background: var(--carta);
     border-radius: 50%;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    box-shadow: var(--ombra);
 }
 
 /* ============================================================
-   CONCORDANZA TRA MODELLI — 3 pallini (temp/pioggia/vento)
+   CONCORDANZA TRA MODELLI — barra orizzontale a 3 segmenti
+   (temperatura / pioggia / vento), non più 3 pallini isolati:
+   più leggibile a colpo d'occhio, stesso linguaggio della marea.
    ============================================================ */
 .prvs-concordanza {
-    display: flex;
-    gap: 6px;
-    margin-top: 4px;
+    margin-top: 8px;
     width: 100%;
-    justify-content: flex-end;
+}
+.prvs-concordanza-bar {
+    display: flex;
+    height: 7px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: rgba(16,38,43,0.08);
+    gap: 2px;
+}
+.prvs-concordanza-seg {
+    flex: 1;
+    height: 100%;
+}
+.prvs-concordanza-seg.assente { background: rgba(16,38,43,0.06); }
+.prvs-concordanza-legenda {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3px;
+    font-size: 0.62rem;
+    color: var(--inchiostro-soft);
+    letter-spacing: .02em;
 }
 
-.prvs-pallino {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    display: inline-block;
-    border: 2px solid rgba(255,255,255,0.9);
-    box-shadow: 0 0 1px rgba(0,0,0,0.5);
-}
-
-.prvs-pallino-verde  { background: #66d16a; }
-.prvs-pallino-giallo { background: #ffc107; }
-.prvs-pallino-rosso  { background: #f44336; }
+.prvs-livello-verde  { background: var(--acqua-soft); }
+.prvs-livello-giallo { background: var(--sole-soft); }
+.prvs-livello-rosso  { background: var(--nizioleto-soft); }
 
 /* Statistiche piccole (umidità/percepita) nelle sole schede orarie
-   del dettaglio, sfondo scuro: spazio libero tra icona+temp e pioggia */
+   del dettaglio */
 .prvs-oraria-stats-scuro {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    font-size: 0.75rem;
+    gap: 2px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--inchiostro-soft);
     line-height: 1.3;
     white-space: nowrap;
-    opacity: 0.95;
 }
 
 /* ============================================================
@@ -514,13 +625,14 @@ body {
 
 .prvs-impostazioni-titolo {
     font-weight: 700;
-    color: var(--blu);
+    font-family: "Space Grotesk", sans-serif;
+    color: var(--inchiostro);
     margin-bottom: 0.2rem;
 }
 
 .prvs-impostazioni-nota {
     font-size: 0.78rem;
-    opacity: 0.7;
+    color: var(--inchiostro-soft);
     margin-bottom: 0.6rem;
 }
 
@@ -528,15 +640,17 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.4rem 0;
+    padding: 0.5rem 0;
     font-size: 0.9rem;
-    border-bottom: 1px solid var(--bordo);
+    color: var(--inchiostro);
+    border-bottom: 1px solid var(--linea);
 }
 
 .prvs-opzione-riga input {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
+    accent-color: var(--nizioleto);
 }
 
 .prvs-opzione-riga input:disabled + * {

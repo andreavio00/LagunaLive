@@ -89,13 +89,10 @@ function iconaPer(categoria, contesto = "scuro", ora = 12) {
     const file = fileIcona(categoria, notte);
 
     if (contesto === "chiaro") {
-        if (categoria === "sun" && !notte) {
-            return `<img src="${ICON_PATH}${file}" width="40" alt="sole">`;
-        }
-        return `<span class="prvs-icona-badge"><img src="${ICON_PATH}${file}" width="34" alt="${categoria || ''}"></span>`;
+        return `<img src="${ICON_PATH}${file}" width="40" alt="${categoria || ''}">`;
     }
 
-    return `<img src="${ICON_PATH}${file}" width="36" alt="${categoria || ''}">`;
+    return `<img src="${ICON_PATH}${file}" width="40" alt="${categoria || ''}">`;
 }
 
 /* ============================================================
@@ -161,14 +158,15 @@ function badgeAllarmi(allarmi, mareaMassima = null) {
    ============================================================ */
 function rigaConcordanza(m1, m2) {
     const c = PrevisioniData.calcolaConcordanza(m1, m2);
-    const pallino = (livello, etichetta) => livello
-        ? `<span class="prvs-pallino prvs-pallino-${livello}" title="${etichetta}"></span>`
-        : "";
     if (!c.temp && !c.pioggia && !c.vento) return "";
+    const seg = (livello, etichetta) => `<div class="prvs-concordanza-seg ${livello ? "prvs-livello-" + livello : "assente"}" title="${etichetta}"></div>`;
     return `<div class="prvs-concordanza">
-        ${pallino(c.temp, "Accordo temperatura")}
-        ${pallino(c.pioggia, "Accordo pioggia")}
-        ${pallino(c.vento, "Accordo vento")}
+        <div class="prvs-concordanza-bar">
+            ${seg(c.temp, "Accordo temperatura")}
+            ${seg(c.pioggia, "Accordo pioggia")}
+            ${seg(c.vento, "Accordo vento")}
+        </div>
+        <div class="prvs-concordanza-legenda"><span>T</span><span>mm</span><span>vento</span></div>
     </div>`;
 }
 
@@ -210,10 +208,10 @@ function renderVistaNormale(previsioni) {
             <div class="prvs-oraria-corpo">
                 <div class="prvs-oraria-icona-temp">
                     ${iconaPer(ora.categoria, "chiaro", ora.ora)}
-                    <div class="prvs-ora-temp-grande">${ora.temp !== null ? Math.round(ora.temp) + "°" : "—"}</div>
+                    <div class="prvs-ora-temp-grande num"><span class="term">🌡️</span>${ora.temp !== null ? Math.round(ora.temp) + "°" : "—"}</div>
                 </div>
                 <div class="prvs-oraria-stats">
-                    <div>🌧️ ${ora.precip !== null ? ora.precip.toFixed(1) + "mm" : "—"}</div>
+                    <div>☂️ ${ora.precip !== null ? ora.precip.toFixed(1) + "mm" : "—"}</div>
                     ${renderCampiOpzionali(ora)}
                 </div>
             </div>
@@ -242,12 +240,12 @@ function creaCardGiorno(giorno) {
         <div class="prvs-giorno-label">${giorno.label}</div>
         ${iconaPer(giorno.sintesi.categoria, "scuro", 12)}
         <div class="prvs-giorno-dati">
-            <div class="prvs-giorno-temp-minmax">
-                🌡️ ${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}
+            <div class="prvs-giorno-temp-minmax num">
+                <span class="term">🌡️</span>${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}
                 / ${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}
             </div>
             <div class="prvs-giorno-pioggia">
-                🌧️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}
+                ☂️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}
             </div>
         </div>
         <div class="prvs-badge-riga">${badgeAllarmi(giorno.allarmi, giorno.mareaMassima)}</div>
@@ -288,11 +286,11 @@ function renderVistaEsplosa(previsioni) {
             <div class="prvs-oraria-corpo">
                 ${iconaPer(giorno.sintesi.categoria, "chiaro", 12)}
                 <div class="prvs-giorno-temp-maxmin">
-                    <div class="tmax">${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}</div>
-                    <div class="tmin">${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}</div>
+                    <div class="tmax num"><span class="term">🌡️</span>${giorno.sintesi.max !== null ? Math.round(giorno.sintesi.max) + "°" : "—"}</div>
+                    <div class="tmin num">${giorno.sintesi.min !== null ? Math.round(giorno.sintesi.min) + "°" : "—"}</div>
                 </div>
                 <div class="prvs-oraria-stats">
-                    <div>🌧️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}</div>
+                    <div>☂️ ${giorno.sintesi.pioggiaTotale !== null ? giorno.sintesi.pioggiaTotale + "mm" : "—"}</div>
                     ${rigaOmbrello}
                 </div>
             </div>
@@ -330,10 +328,10 @@ function renderVistaEsplosa(previsioni) {
                 <div class="prvs-giorno-label">${fascia.label}</div>
                 <div class="prvs-giorno-icona-temp">
                     ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "scuro", oraRappresentativa)}
-                    <div class="prvs-giorno-temp-grande">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
+                    <div class="prvs-giorno-temp-grande num"><span class="term">🌡️</span>${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
                 </div>
                 <div class="prvs-giorno-dati-destra">
-                    🌧️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}
+                    ☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}
                 </div>
                 ${rigaConcordanza(confrontoA, confrontoB)}
                 <div class="prvs-badge-riga">${badgeAllarmi(fascia.allarmi)}</div>
@@ -366,13 +364,13 @@ function renderVistaEsplosa(previsioni) {
                 <div class="prvs-giorno-label">${String(oraDett.ora).padStart(2, "0")}:00</div>
                 <div class="prvs-giorno-icona-temp">
                     ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "scuro", oraDett.ora)}
-                    <div class="prvs-giorno-temp-grande">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
+                    <div class="prvs-giorno-temp-grande num"><span class="term">🌡️</span>${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
                 </div>
                 <div class="prvs-oraria-stats-scuro">
                     ${renderCampiOpzionali({ ...rappresentativo, marea: oraDett.marea })}
                 </div>
                 <div class="prvs-giorno-dati-destra">
-                    🌧️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}
+                    ☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}
                 </div>
                 ${rigaConcordanza(confrontoA, confrontoB)}
             `;
