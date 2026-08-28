@@ -305,13 +305,13 @@ body {
     gap: 8px;
     width: 100%;
     box-sizing: border-box;
-    background: var(--acqua);
-    box-shadow: var(--ombra);
-    color: #fff;
+    background: var(--carta);
+    border: 2px solid var(--acqua);
+    color: var(--acqua);
     font-size: 0.98rem;
     font-weight: 700;
     text-decoration: none;
-    padding: 13px 16px;
+    padding: 11px 16px;
     border-radius: 12px;
     letter-spacing: .01em;
 }

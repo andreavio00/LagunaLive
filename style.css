@@ -235,50 +235,61 @@ h1 {
   text-align: center;
 }
 
-/* --- Card previsioni (fascia oraria attuale, layout centrato) --- */
+/* --- Card previsioni (fascia oraria attuale, riga compatta) --- */
 
 .prev-preview {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
   text-decoration: none;
   color: inherit;
-  padding: 6px 2px 2px;
+  padding: 2px;
+}
+
+.prev-preview-riga {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .prev-preview-icon {
-  font-size: 2.6em;
+  font-size: 1.8em;
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.prev-preview-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .prev-preview-fascia {
-  font-size: 0.78em;
+  font-size: 0.72em;
   font-weight: bold;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #888;
-  margin-top: 6px;
-}
-
-.prev-preview-temp {
-  font-size: 2.3em;
-  font-weight: bold;
-  line-height: 1.1;
-  color: #1a3c8f;
-  margin-top: 2px;
 }
 
 .prev-preview-cat {
-  font-size: 1em;
+  font-size: 0.95em;
   font-weight: 600;
   color: #14294f;
-  margin-top: 2px;
+}
+
+.prev-preview-temp {
+  font-size: 1.8em;
+  font-weight: bold;
+  line-height: 1;
+  color: #1a3c8f;
+  flex-shrink: 0;
 }
 
 .prev-preview-extra {
-  font-size: 0.85em;
+  font-size: 0.82em;
   color: #666;
+  text-align: center;
   margin-top: 8px;
 }
 
