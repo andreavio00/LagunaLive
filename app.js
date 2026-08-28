@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.37";
+const APP_VERSION = "v3.2";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -254,7 +254,7 @@ function heatIndex(tempC, humidity) {
   const R = humidity;
 
   let HI =
-    -42.379 +
+    -42.389 +
     2.04901523 * T +
     10.14333127 * R -
     0.22475541 * T * R -

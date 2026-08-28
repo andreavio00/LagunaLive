@@ -6,7 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="previsioni.css">
+    <!-- ATTENZIONE: il numero "?v=3.2" qui e negli script sotto va
+         aggiornato insieme a CACHE_NAME/SHELL_FILES in sw.js e a
+         PRVS_VERSION in previsioni-render.js ad ogni rilascio, stesso
+         motivo spiegato in index.html per style.css/app.js. -->
+    <link rel="stylesheet" href="previsioni.css?v=3.2">
 </head>
 <body>
 
@@ -59,6 +63,8 @@
         </div>
     </section>
 
+    <div id="prvs-versione" class="prvs-versione"></div>
+
 </main>
 
 <!-- MODAL IMPOSTAZIONI -->
@@ -86,9 +92,9 @@
 
 <!-- Dato osservato in tempo reale (stesse fonti di LagunaLive/index.html):
      va caricato prima di previsioni-render.js, che lo usa in renderAttuale(). -->
-<script src="osservazioni.js"></script>
-<script src="previsioni-data.js"></script>
-<script src="previsioni-render.js"></script>
+<script src="osservazioni.js?v=3.2"></script>
+<script src="previsioni-data.js?v=3.2"></script>
+<script src="previsioni-render.js?v=3.2"></script>
 
 </body>
 </html>

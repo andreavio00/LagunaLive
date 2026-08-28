@@ -702,6 +702,14 @@ body {
     border-radius: 12px;
 }
 
+/* Numero di versione, in fondo pagina come in index.html */
+.prvs-versione {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--inchiostro-soft);
+    padding: 1rem 0 0.6rem;
+}
+
 /* TABELLA ORARIA (modal confronto modelli) */
 .prvs-table-oraria {
     width: 100%;

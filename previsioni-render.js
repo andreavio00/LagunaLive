@@ -10,6 +10,14 @@
 
 const ICON_PATH = "icons/";
 
+// Numero di versione mostrato in fondo alla pagina. Duplicato di
+// APP_VERSION in app.js per lo stesso motivo di osservazioni.js
+// (vedi commento li': pagine indipendenti, niente dipendenza
+// incrociata). Va tenuto allineato manualmente a CACHE_NAME/
+// SHELL_FILES in sw.js e ai "?v=..." qui in previsioni.html ad
+// ogni rilascio.
+const PRVS_VERSION = "v3.2";
+
 /* ============================================================
    PREFERENZE UTENTE — modello principale + campi opzionali nel
    dettaglio orario. Salvate in localStorage (funziona normalmente
@@ -343,9 +351,11 @@ function coloreMarea(cm) {
 function renderMarea(previsioni) {
     const cont = document.getElementById("prvs-fascia-marea");
     const adesso = Date.now();
+    // Max 4 righe: coi picchi che si alternano max/min ogni ~6 ore,
+    // 4 righe garantiscono di vederne sempre almeno 2 di "massimo".
     const picchi = (previsioni.mareaPrevisioni || [])
         .filter(m => new Date(m.datetime).getTime() >= adesso)
-        .slice(0, 6);
+        .slice(0, 4);
 
     if (picchi.length === 0) {
         cont.innerHTML = `<span class="prvs-caricamento">Dati marea non disponibili al momento.</span>`;
@@ -711,6 +721,7 @@ document.getElementById("prvs-btn-salva-impostazioni").addEventListener("click",
    INIT
    ============================================================ */
 async function init() {
+    document.getElementById("prvs-versione").textContent = PRVS_VERSION;
     caricaSituazioneAttuale();
     PrevisioniData.impostaPreferenzaModello(preferenze.modelloPrincipale);
     try {

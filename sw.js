@@ -1,4 +1,4 @@
-const CACHE_NAME = "lagunalive-shell-v2.37";
+const CACHE_NAME = "lagunalive-shell-v3.2";
 
 // Solo la "cornice" dell'app (HTML/CSS/JS/icone) viene messa in cache:
 // i dati meteo restano sempre presi dalla rete in tempo reale, cosi'
@@ -13,12 +13,32 @@ const CACHE_NAME = "lagunalive-shell-v2.37";
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./style.css?v=2.37",
-  "./app.js?v=2.37",
+  "./style.css?v=3.2",
+  "./app.js?v=3.2",
   "./manifest.json",
   "./stations.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  // Icone meteo usate da previsioni-render.js (iconaPer/fileIcona):
+  // precaricate cosi' previsioni.html mostra le icone giuste anche
+  // offline, non solo la struttura della pagina.
+  "./icons/sole.png",
+  "./icons/luna.png",
+  "./icons/poco_nuvoloso.png",
+  "./icons/poco_nuvoloso_notte.png",
+  "./icons/nuvoloso.png",
+  "./icons/pioggia.png",
+  "./icons/temporale.png",
+  "./icons/neve.png",
+  "./icons/nebbia.png",
+  // Pagina previsioni: stessa logica di cache-busting/precache della
+  // shell principale, cosi' anche lei si aggiorna forzatamente ad ogni
+  // rilascio e funziona offline dopo la prima visita.
+  "./previsioni.html",
+  "./previsioni.css?v=3.2",
+  "./osservazioni.js?v=3.2",
+  "./previsioni-data.js?v=3.2",
+  "./previsioni-render.js?v=3.2"
 ];
 
 self.addEventListener("install", (event) => {
