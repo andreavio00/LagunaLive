@@ -15,8 +15,12 @@
     <button id="prvs-btn-impostazioni" class="prvs-btn-impostazioni" title="Impostazioni">⚙️</button>
     <h1>Previsioni Meteo</h1>
     <div class="prvs-luogo">Venezia — Centro Storico</div>
+    <nav class="prvs-nav">
+        <a href="index.html" class="prvs-nav-link">🌊 Situazione live</a>
+    </nav>
     <div id="prvs-attuale" class="prvs-attuale">
-        <span class="prvs-attuale-caricamento">Caricamento situazione attuale…</span>
+        <span id="prvs-attuale-osservato" class="prvs-attuale-caricamento">Caricamento situazione attuale…</span>
+        <span id="prvs-attuale-previsto" class="prvs-attuale-previsto"></span>
     </div>
 </header>
 
@@ -81,6 +85,9 @@
     </div>
 </div>
 
+<!-- Dato osservato in tempo reale (stesse fonti di LagunaLive/index.html):
+     va caricato prima di previsioni-render.js, che lo usa in renderAttuale(). -->
+<script src="osservazioni.js"></script>
 <script src="previsioni-data.js"></script>
 <script src="previsioni-render.js"></script>
 

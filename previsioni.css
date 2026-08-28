@@ -293,6 +293,22 @@ body {
     margin-bottom: 8px;
 }
 
+.prvs-nav {
+    margin-bottom: 0.6rem;
+}
+
+.prvs-nav-link {
+    display: inline-block;
+    background: var(--carta);
+    box-shadow: var(--ombra);
+    color: var(--inchiostro);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+}
+
 .prvs-attuale {
     font-size: 1.05rem;
     font-weight: 700;
@@ -304,6 +320,12 @@ body {
     font-size: 0.9rem;
     color: var(--inchiostro-soft);
     font-weight: normal;
+}
+
+.prvs-attuale-previsto {
+    font-size: 0.9rem;
+    font-weight: normal;
+    color: var(--inchiostro-soft);
 }
 
 /* Riga giorno: griglia icona | testo | dati, come nella shell.

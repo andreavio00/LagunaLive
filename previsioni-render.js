@@ -244,14 +244,54 @@ let previsioniCache = null;
 
 /* ============================================================
    FASCIA 1 — Situazione attuale
+   Due parti indipendenti, ciascuna aggiornata quando la sua fonte
+   e' pronta (l'osservato arriva da Cavanis/Misericordia, il previsto
+   dal riepilogo giorni dei modelli): non c'e' bisogno di aspettare
+   entrambe per mostrare la prima.
    ============================================================ */
-function renderAttuale() {
-    const el = document.getElementById("prvs-attuale");
-    // TODO: collegare qui la stessa fonte dati (stazioni osservate)
-    // già usata nella dashboard principale di LagunaLive.
-    el.innerHTML = `<span class="prvs-attuale-caricamento">
-        Dato osservato — da collegare alle stazioni LagunaLive
-    </span>`;
+function renderAttualeOsservato(dati) {
+    const el = document.getElementById("prvs-attuale-osservato");
+    el.classList.remove("prvs-attuale-caricamento");
+
+    if (!dati) {
+        el.textContent = "Dato osservato non disponibile";
+        return;
+    }
+
+    const vento = (dati.windSpeed != null && !isNaN(dati.windSpeed) && dati.windDir != null && !isNaN(dati.windDir))
+        ? `${Math.round(dati.windSpeed * 3.6)} km/h ${Osservazioni.windDirection(dati.windDir)}`
+        : "n.d.";
+
+    el.textContent = `Osservato ora: ${dati.temperature.toFixed(1)}° · ${dati.humidity.toFixed(0)}% · vento ${vento}`;
+}
+
+function renderPrevistoOggi(previsioni) {
+    const el = document.getElementById("prvs-attuale-previsto");
+    const oggi = previsioni.riepilogoGiorni.find(g => g.data === previsioni.oggiStr);
+
+    if (!oggi || oggi.sintesi.min == null || oggi.sintesi.max == null) return;
+
+    el.textContent = ` · Previsto oggi: ${Math.round(oggi.sintesi.min)}°/${Math.round(oggi.sintesi.max)}°`;
+}
+
+async function caricaSituazioneAttuale() {
+    try {
+        const [cavanis, vento] = await Promise.all([
+            Osservazioni.loadCavanis(),
+            Osservazioni.loadMisericordiaWind()
+        ]);
+
+        renderAttualeOsservato({
+            temperature: cavanis.temperature,
+            humidity: cavanis.humidity,
+            windSpeed: vento.available ? vento.windSpeed : null,
+            windDir: vento.available ? vento.windDir : null
+        });
+
+    } catch (errore) {
+        console.error("Errore nel caricamento della situazione attuale:", errore);
+        renderAttualeOsservato(null);
+    }
 }
 
 /* ============================================================
@@ -685,11 +725,12 @@ document.getElementById("prvs-btn-salva-impostazioni").addEventListener("click",
    INIT
    ============================================================ */
 async function init() {
-    renderAttuale();
+    caricaSituazioneAttuale();
     PrevisioniData.impostaPreferenzaModello(preferenze.modelloPrincipale);
     try {
         previsioniCache = await PrevisioniData.ottieniPrevisioni();
         renderPagina(previsioniCache);
+        renderPrevistoOggi(previsioniCache);
     } catch (errore) {
         console.error("Errore nel caricamento delle previsioni:", errore);
         document.getElementById("prvs-oggi-scroll").innerHTML =

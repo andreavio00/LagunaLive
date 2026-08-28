@@ -18,6 +18,22 @@ h1 {
   min-height: 1.2em;
 }
 
+.app-nav {
+  margin-bottom: 12px;
+}
+
+.app-nav-link {
+  display: inline-block;
+  background: white;
+  color: #14294f;
+  font-size: 0.85em;
+  font-weight: bold;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(20, 60, 110, 0.08);
+}
+
 .force-update-link {
   color: #888;
   font-size: 0.8em;
