@@ -299,15 +299,31 @@ body {
 }
 
 .prvs-nav-link {
-    display: inline-block;
-    background: var(--carta);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--acqua);
     box-shadow: var(--ombra);
-    color: var(--inchiostro);
-    font-size: 0.8rem;
+    color: #fff;
+    font-size: 0.98rem;
     font-weight: 700;
     text-decoration: none;
-    padding: 6px 12px;
-    border-radius: 8px;
+    padding: 13px 16px;
+    border-radius: 12px;
+    letter-spacing: .01em;
+}
+
+.prvs-nav-arrow {
+    font-weight: 400;
+    opacity: 0.85;
+    transition: transform 0.15s ease;
+}
+
+.prvs-nav-link:active .prvs-nav-arrow {
+    transform: translateX(3px);
 }
 
 .prvs-attuale {

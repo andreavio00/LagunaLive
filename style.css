@@ -235,44 +235,51 @@ h1 {
   text-align: center;
 }
 
-/* --- Card previsioni della settimana (link + anteprima "oggi") --- */
+/* --- Card previsioni (fascia oraria attuale, layout centrato) --- */
 
 .prev-preview {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  text-align: center;
   text-decoration: none;
   color: inherit;
-  padding: 4px 2px;
-  margin: -4px -2px;
+  padding: 6px 2px 2px;
 }
 
 .prev-preview-icon {
-  font-size: 1.9em;
+  font-size: 2.6em;
   line-height: 1;
 }
 
-.prev-preview-testo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.prev-preview-cat {
+.prev-preview-fascia {
+  font-size: 0.78em;
   font-weight: bold;
-  font-size: 0.95em;
-  color: #14294f;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+  margin-top: 6px;
 }
 
 .prev-preview-temp {
-  font-size: 0.85em;
-  color: #666;
+  font-size: 2.3em;
+  font-weight: bold;
+  line-height: 1.1;
+  color: #1a3c8f;
   margin-top: 2px;
 }
 
-.prev-preview-arrow {
-  font-size: 1.4em;
-  color: #aab4c4;
+.prev-preview-cat {
+  font-size: 1em;
+  font-weight: 600;
+  color: #14294f;
+  margin-top: 2px;
+}
+
+.prev-preview-extra {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 8px;
 }
 
 /* --- Modale --- */

@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.35";
+const APP_VERSION = "v2.36";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -1454,24 +1454,42 @@ const CATEGORIA_TESTO_HOME = {
   rain: "Pioggia", storm: "Temporale", snow: "Neve", fog: "Nebbia"
 };
 
-function updatePrevisioniPreviewUI(oggi) {
+function updatePrevisioniPreviewUI(fascia, oggi) {
   const icona = document.getElementById("previsioniIcon");
-  const categoria = document.getElementById("previsioniCategoria");
+  const fasciaLabel = document.getElementById("previsioniFascia");
   const temp = document.getElementById("previsioniTemp");
+  const categoria = document.getElementById("previsioniCategoria");
+  const extra = document.getElementById("previsioniExtra");
 
-  if (!oggi) {
+  if (!fascia || !fascia.sintesi) {
     icona.textContent = "📅";
-    categoria.textContent = "Previsioni non disponibili";
-    temp.textContent = "";
+    fasciaLabel.textContent = "";
+    temp.textContent = "Previsioni non disponibili";
+    categoria.textContent = "";
+    extra.textContent = "";
     return;
   }
 
-  icona.textContent = ICONE_PREVISIONI_HOME[oggi.sintesi.categoria] || "📅";
-  categoria.textContent = "Oggi: " + (CATEGORIA_TESTO_HOME[oggi.sintesi.categoria] || "—");
-  temp.textContent =
-    (oggi.sintesi.min != null && oggi.sintesi.max != null)
-      ? Math.round(oggi.sintesi.min) + "° / " + Math.round(oggi.sintesi.max) + "°"
-      : "";
+  const s = fascia.sintesi;
+
+  icona.textContent = ICONE_PREVISIONI_HOME[s.categoria] || "📅";
+  fasciaLabel.textContent = fascia.label;
+  temp.textContent = s.temp != null ? Math.round(s.temp) + "°" : "—";
+  categoria.textContent = CATEGORIA_TESTO_HOME[s.categoria] || "—";
+
+  // Dato di riempimento: un solo elemento, quello più rilevante in
+  // questo momento. Priorita': acqua alta (se prevista sopra soglia
+  // in questa fascia) > pioggia (solo se prevista, in mm) > umidita'
+  // (sempre disponibile, usata come ripiego).
+  if (fascia.allarmi && fascia.allarmi.acquaAlta && oggi && oggi.mareaMassima != null) {
+    extra.textContent = `🌊 Picco marea previsto: ${oggi.mareaMassima} cm`;
+  } else if (s.precip != null && s.precip > 0) {
+    extra.textContent = `🌧️ ${s.precip} mm attesi`;
+  } else if (s.umidita != null) {
+    extra.textContent = `💧 Umidità ${s.umidita}%`;
+  } else {
+    extra.textContent = "";
+  }
 }
 
 function updateAllarmeUI(oggi) {
@@ -1508,12 +1526,24 @@ async function loadPrevisioniPreview() {
     const previsioni = await PrevisioniData.ottieniPrevisioni();
     const oggi = previsioni.riepilogoGiorni.find((g) => g.data === previsioni.oggiStr);
 
-    updatePrevisioniPreviewUI(oggi);
+    // Fascia oraria corrente (notte/mattina/pomeriggio/sera), stessa
+    // suddivisione usata in previsioni.html: la home mostra "adesso"
+    // invece del riepilogo dell'intera giornata, per restare coerente
+    // con lo spirito "tempo reale" del resto della dashboard.
+    const oraAttuale = new Date().getHours();
+    const fasciaOraria = PrevisioniData.FASCE_ORARIE.find(
+      (f) => oraAttuale >= f.oreInizio && oraAttuale < f.oreFine
+    );
+    const fasciaAttuale = oggi && fasciaOraria
+      ? oggi.fasceGiorno.find((f) => f.fascia === fasciaOraria.id)
+      : null;
+
+    updatePrevisioniPreviewUI(fasciaAttuale, oggi);
     updateAllarmeUI(oggi);
 
   } catch (err) {
     console.warn("Anteprima previsioni non disponibile:", err);
-    updatePrevisioniPreviewUI(null);
+    updatePrevisioniPreviewUI(null, null);
     updateAllarmeUI(null);
   }
 }
