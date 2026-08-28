@@ -158,13 +158,25 @@ function categoriaTesto(categoria) {
 
 /* ============================================================
    TAG ALLARME — pillola colorata sotto la descrizione meteo
-   (non più badge circolari a destra).
+   (non più badge circolari a destra). Per temporale e nebbia
+   aggiunge anche il momento della giornata (fascia in cui scatta
+   l'allarme), altrimenti "Temporale" da solo non dice se è in
+   corso adesso o atteso stasera.
    ============================================================ */
-function tagAllarmi(allarmi, mareaMassima = null) {
+function momentoAllarme(fasceGiorno, campo) {
+    if (!fasceGiorno) return "";
+    const fasce = fasceGiorno.filter(f => f.allarmi && f.allarmi[campo]).map(f => f.label);
+    return fasce.length ? " · " + fasce.join(", ") : "";
+}
+function tagAllarmi(allarmi, mareaMassima = null, fasceGiorno = null) {
     if (!allarmi) return "";
     const pezzi = [];
-    if (allarmi.temporaleForte) pezzi.push(`<span class="prvs-tag-allarme prvs-tag-temporale">Temporale forte</span>`);
-    if (allarmi.nebbiaPersistente) pezzi.push(`<span class="prvs-tag-allarme prvs-tag-nebbia">Nebbia persistente</span>`);
+    if (allarmi.temporaleForte) {
+        pezzi.push(`<span class="prvs-tag-allarme prvs-tag-temporale">Temporale forte${momentoAllarme(fasceGiorno, "temporaleForte")}</span>`);
+    }
+    if (allarmi.nebbiaPersistente) {
+        pezzi.push(`<span class="prvs-tag-allarme prvs-tag-nebbia">Nebbia persistente${momentoAllarme(fasceGiorno, "nebbiaPersistente")}</span>`);
+    }
     if (allarmi.acquaAlta) {
         const testo = mareaMassima !== null ? `Acqua alta · ${mareaMassima}cm` : "Acqua alta";
         pezzi.push(`<span class="prvs-tag-allarme prvs-tag-acqua-alta">${testo}</span>`);
@@ -186,10 +198,11 @@ function coloreMm(mm) {
 function pioggiaBar(mm, scalaMax = 12) {
     const valore = mm !== null && mm !== undefined ? mm : 0;
     const pct = Math.min(100, Math.round((valore / scalaMax) * 100));
+    const mmVisualizzato = mm !== null && mm !== undefined ? Math.round(mm * 10) / 10 : null;
     return `<div class="prvs-pioggia">
         <span>☂️</span>
         <div class="prvs-pioggia-track"><div class="prvs-pioggia-fill" style="width:${pct}%; background:${coloreMm(mm)}"></div></div>
-        <span class="prvs-pioggia-mm">${mm !== null && mm !== undefined ? mm + "mm" : "—"}</span>
+        <span class="prvs-pioggia-mm">${mmVisualizzato !== null ? mmVisualizzato + "mm" : "—"}</span>
     </div>`;
 }
 
@@ -246,16 +259,10 @@ function renderPagina(previsioni) {
         cella.className = "prvs-oraria-cell";
         cella.innerHTML = `
             <div class="prvs-ora-testo">${String(ora.ora).padStart(2, "0")}:00</div>
-            <div class="prvs-oraria-corpo">
-                <div class="prvs-oraria-icona-temp">
-                    ${iconaPer(ora.categoria, "chiaro", ora.ora)}
-                    <div class="prvs-ora-temp-grande num"><span class="term">🌡️</span>${ora.temp !== null ? Math.round(ora.temp) + "°" : "—"}</div>
-                </div>
-                <div class="prvs-oraria-stats">
-                    <div>☂️ ${ora.precip !== null ? ora.precip.toFixed(1) + "mm" : "—"}</div>
-                    <div>💧 ${ora.umidita !== null && ora.umidita !== undefined ? Math.round(ora.umidita) + "%" : "—"}</div>
-                </div>
-            </div>
+            <div class="prvs-oraria-icona">${iconaPer(ora.categoria, "chiaro", ora.ora)}</div>
+            <div class="prvs-ora-temp num"><span class="term">🌡️</span>${ora.temp !== null ? Math.round(ora.temp) + "°" : "—"}</div>
+            ${pioggiaBar(ora.precip)}
+            <div class="prvs-ora-sky">${categoriaTesto(ora.categoria)}</div>
         `;
         scroll.appendChild(cella);
     }
@@ -276,6 +283,61 @@ function renderPagina(previsioni) {
         const item = contenitore.querySelector(`[data-data="${stato.giornoAperto}"]`);
         if (giorno && item) apriGiorno(previsioni, giorno, item);
     }
+
+    renderMarea(previsioni);
+}
+
+/* ============================================================
+   MAREA — idrometro con le soglie ufficiali del Centro Maree
+   Venezia (sostenuta 80cm, molto sostenuta 110cm, eccezionale
+   140cm). Se il worker/proxy marea fallisce, mareaPrevisioni è
+   semplicemente vuoto: mostriamo un avviso, mai un errore JS.
+   ============================================================ */
+const SOGLIE_MAREA = [80, 110, 140];
+const SCALA_MAREA = 180;
+
+function coloreMarea(cm) {
+    if (cm >= 140) return "var(--nizioleto-soft)";
+    if (cm >= 110) return "var(--sole-soft)";
+    if (cm >= 80)  return "var(--acqua-soft)";
+    return "var(--bricola-soft)";
+}
+
+function renderMarea(previsioni) {
+    const cont = document.getElementById("prvs-fascia-marea");
+    const adesso = Date.now();
+    const picchi = (previsioni.mareaPrevisioni || [])
+        .filter(m => new Date(m.datetime).getTime() >= adesso)
+        .slice(0, 6);
+
+    if (picchi.length === 0) {
+        cont.innerHTML = `<span class="prvs-caricamento">Dati marea non disponibili al momento.</span>`;
+        return;
+    }
+
+    cont.innerHTML = picchi.map(m => {
+        const pct = Math.min(100, Math.round((m.valore / SCALA_MAREA) * 100));
+        const soglie = SOGLIE_MAREA.map(s =>
+            `<div class="prvs-gauge-soglia" data-cm="${s}" style="left:${(s / SCALA_MAREA) * 100}%"></div>`
+        ).join("");
+        const giornoDiverso = m.data !== previsioni.oggiStr;
+        const etichettaGiorno = giornoDiverso ? ` · ${PrevisioniData.formattaDataBreve(m.data)}` : "";
+        return `
+            <div class="prvs-marea-riga">
+                <div class="prvs-marea-top">
+                    <span>
+                        <span class="prvs-marea-ora num">${m.ora}${etichettaGiorno}</span>
+                        <span class="prvs-marea-tipo">${m.tipo === "max" ? "Massimo" : "Minimo"}</span>
+                    </span>
+                    <span class="prvs-marea-cm num" style="color:${coloreMarea(m.valore)}">${m.valore}cm</span>
+                </div>
+                <div class="prvs-gauge">
+                    <div class="prvs-gauge-fill" style="width:${pct}%; background:${coloreMarea(m.valore)}"></div>
+                    ${soglie}
+                </div>
+            </div>
+        `;
+    }).join("") + `<div class="prvs-gauge-legenda"><span>0 cm</span><span>${SCALA_MAREA} cm</span></div>`;
 }
 
 function creaVoceGiorno(previsioni, giorno, idx) {
@@ -290,7 +352,7 @@ function creaVoceGiorno(previsioni, giorno, idx) {
         <div class="prvs-giorno-testo">
             <div class="prvs-giorno-label">${giorno.label}<span class="prvs-chevron">⌄</span></div>
             <div class="prvs-giorno-sky">${categoriaTesto(giorno.sintesi.categoria)}</div>
-            ${tagAllarmi(giorno.allarmi, giorno.mareaMassima)}
+            ${tagAllarmi(giorno.allarmi, giorno.mareaMassima, giorno.fasceGiorno)}
         </div>
         <div class="prvs-giorno-dati">
             <div class="prvs-giorno-temp">
@@ -323,9 +385,11 @@ function toggleGiorno(previsioni, giorno, item) {
     if (!giaAperto) apriGiorno(previsioni, giorno, item);
 }
 
-/* Oggi e domani (indice 0-1) → chip orarie (24, o quelle residue per
-   oggi). Dal 3° giorno in poi (indice 2+, oltre l'orizzonte ARPAE
-   delle 72h) → chip di fascia (mattina/pomeriggio/sera/notte). */
+/* Oggi e domani (indice 0-1): primo livello fasce → tap su una fascia
+   espande sotto le ore di quella fascia (nessun confronto a livello
+   fascia) → tap su un'ora apre il confronto. Dal 3° giorno in poi
+   (indice 2+, oltre l'orizzonte ARPAE delle 72h): un solo livello,
+   fasce → tap apre subito il confronto (nessuna vista oraria). */
 function apriGiorno(previsioni, giorno, item) {
     item.classList.add("aperto");
     stato.giornoAperto = giorno.data;
@@ -333,66 +397,97 @@ function apriGiorno(previsioni, giorno, item) {
     const idx = previsioni.riepilogoGiorni.findIndex(g => g.data === giorno.data);
     const usaOre = idx <= 1;
     const espansione = item.querySelector(".prvs-giorno-espansione");
+
     const scroll = document.createElement("div");
     scroll.className = "prvs-slot-scroll";
     espansione.appendChild(scroll);
+
+    const scrollOre = document.createElement("div");
+    espansione.appendChild(scrollOre);
+
     const dettaglio = document.createElement("div");
     espansione.appendChild(dettaglio);
 
-    const seleziona = (chip, titolo, arpae, ecmwf, seamless, confrontoA, confrontoB) => {
-        scroll.querySelectorAll(".prvs-slot-chip").forEach(c => c.classList.remove("selezionata"));
+    const selezionaConfronto = (chip, contenitoreChip, titolo, arpae, ecmwf, seamless) => {
+        contenitoreChip.querySelectorAll(".prvs-slot-chip").forEach(c => c.classList.remove("selezionata"));
         chip.classList.add("selezionata");
+        const confrontoA = arpae || ecmwf;
+        const confrontoB = arpae ? ecmwf : seamless;
         mostraConfrontoInline(dettaglio, titolo, arpae, ecmwf, seamless, confrontoA, confrontoB);
     };
 
-    if (usaOre) {
-        let oreDaMostrare = giorno.oreDettaglio;
-        if (giorno.data === previsioni.oggiStr) {
-            const oraCorrente = new Date().getHours();
-            oreDaMostrare = oreDaMostrare.filter(o => o.ora >= oraCorrente);
-        }
-        for (const oraDett of oreDaMostrare) {
-            const arpae = oraDett.modelli.arpae || null;
-            const ecmwf = oraDett.modelli.ecmwf || null;
-            const seamless = oraDett.modelli.icon || null;
-            const rappresentativo = arpae || ecmwf;
-            const chip = document.createElement("div");
-            chip.className = "prvs-slot-chip";
-            chip.innerHTML = `
-                <div class="prvs-slot-h">${String(oraDett.ora).padStart(2, "0")}:00</div>
-                ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "chiaro", oraDett.ora)}
-                <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
-                <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
-            `;
+    const creaChipOra = (oraDett) => {
+        const arpae = oraDett.modelli.arpae || null;
+        const ecmwf = oraDett.modelli.ecmwf || null;
+        const seamless = oraDett.modelli.icon || null;
+        const rappresentativo = arpae || ecmwf;
+        const chip = document.createElement("div");
+        chip.className = "prvs-slot-chip";
+        chip.innerHTML = `
+            <div class="prvs-slot-h">${String(oraDett.ora).padStart(2, "0")}:00</div>
+            ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "chiaro", oraDett.ora)}
+            <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
+            <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
+            <div class="prvs-slot-extra">${renderCampiOpzionali({ ...rappresentativo, marea: oraDett.marea })}</div>
+        `;
+        chip.addEventListener("click", () =>
+            selezionaConfronto(chip, scrollOre, `Ore ${String(oraDett.ora).padStart(2, "0")}:00`, arpae, ecmwf, seamless)
+        );
+        return chip;
+    };
+
+    // Per oggi, le fasce già interamente trascorse (es. "Notte" o
+    // "Mattina" se sono le 14:00) non vengono nemmeno mostrate come
+    // chip di primo livello — non solo filtrate le ore al loro interno.
+    let fasceDaMostrare = giorno.fasceGiorno;
+    if (giorno.data === previsioni.oggiStr) {
+        const oraCorrente = new Date().getHours();
+        fasceDaMostrare = fasceDaMostrare.filter(f => {
+            const range = PrevisioniData.FASCE_ORARIE.find(r => r.id === f.fascia);
+            return range.oreFine > oraCorrente;
+        });
+    }
+
+    for (const fascia of fasceDaMostrare) {
+        const arpae = fascia.modelli.arpae || null;
+        const ecmwf = fascia.modelli.ecmwf || null;
+        const seamless = fascia.modelli.icon || null;
+        const rappresentativo = arpae || ecmwf;
+        const oraRappresentativa = ORA_RAPPRESENTATIVA_FASCIA[fascia.fascia];
+        const chip = document.createElement("div");
+        chip.className = "prvs-slot-chip";
+        chip.innerHTML = `
+            <div class="prvs-slot-h">${fascia.label}</div>
+            ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "chiaro", oraRappresentativa)}
+            <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
+            <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
+            <div class="prvs-slot-extra">${renderCampiOpzionali(rappresentativo)}</div>
+        `;
+
+        if (usaOre) {
             chip.addEventListener("click", () => {
-                const confrontoA = arpae || ecmwf;
-                const confrontoB = arpae ? ecmwf : seamless;
-                seleziona(chip, `Ore ${String(oraDett.ora).padStart(2, "0")}:00`, arpae, ecmwf, seamless, confrontoA, confrontoB);
+                scroll.querySelectorAll(".prvs-slot-chip").forEach(c => c.classList.remove("selezionata"));
+                chip.classList.add("selezionata");
+                dettaglio.innerHTML = "";
+
+                const range = PrevisioniData.FASCE_ORARIE.find(f => f.id === fascia.fascia);
+                let oreFascia = giorno.oreDettaglio.filter(o => o.ora >= range.oreInizio && o.ora < range.oreFine);
+                if (giorno.data === previsioni.oggiStr) {
+                    const oraCorrente = new Date().getHours();
+                    oreFascia = oreFascia.filter(o => o.ora >= oraCorrente);
+                }
+                scrollOre.className = "prvs-slot-scroll";
+                scrollOre.innerHTML = "";
+                if (oreFascia.length === 0) {
+                    scrollOre.innerHTML = `<div class="prvs-caricamento" style="padding:4px 2px;">Nessun'ora residua in questa fascia.</div>`;
+                } else {
+                    for (const oraDett of oreFascia) scrollOre.appendChild(creaChipOra(oraDett));
+                }
             });
-            scroll.appendChild(chip);
+        } else {
+            chip.addEventListener("click", () => selezionaConfronto(chip, scroll, fascia.label, arpae, ecmwf, seamless));
         }
-    } else {
-        for (const fascia of giorno.fasceGiorno) {
-            const arpae = fascia.modelli.arpae || null;
-            const ecmwf = fascia.modelli.ecmwf || null;
-            const seamless = fascia.modelli.icon || null;
-            const rappresentativo = arpae || ecmwf;
-            const oraRappresentativa = ORA_RAPPRESENTATIVA_FASCIA[fascia.fascia];
-            const chip = document.createElement("div");
-            chip.className = "prvs-slot-chip";
-            chip.innerHTML = `
-                <div class="prvs-slot-h">${fascia.label}</div>
-                ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "chiaro", oraRappresentativa)}
-                <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
-                <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
-            `;
-            chip.addEventListener("click", () => {
-                const confrontoA = arpae || ecmwf;
-                const confrontoB = arpae ? ecmwf : seamless;
-                seleziona(chip, fascia.label, arpae, ecmwf, seamless, confrontoA, confrontoB);
-            });
-            scroll.appendChild(chip);
-        }
+        scroll.appendChild(chip);
     }
 }
 

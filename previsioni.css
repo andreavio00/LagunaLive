@@ -76,16 +76,17 @@ body {
 }
 
 .prvs-oraria-cell {
-    min-width: 148px;
+    min-width: 96px;
     background: var(--carta);
-    border-radius: 16px;
-    padding: 12px 14px;
-    text-align: left;
+    border-radius: 18px;
+    padding: 14px 10px;
+    text-align: center;
     scroll-snap-align: start;
     border: none;
     box-shadow: var(--ombra);
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 8px;
 }
 
@@ -99,32 +100,25 @@ body {
 
 /* Corpo orizzontale: icona a sinistra, temperatura al centro,
    colonnina di dati piccoli a destra */
-.prvs-oraria-corpo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+.prvs-oraria-icona img { width: 38px; }
 
-/* Icona + temperatura raggruppate a sinistra (contesto chiaro:
-   striscia ore/giorni in alto) */
-.prvs-oraria-icona-temp {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.prvs-ora-temp-grande {
+.prvs-ora-temp {
     font-family: "Space Grotesk", sans-serif;
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 700;
-    min-width: 44px;
-    text-align: center;
     color: var(--inchiostro);
     display: flex;
     align-items: center;
     gap: 3px;
 }
-.prvs-ora-temp-grande .term { font-size: 0.85rem; }
+.prvs-ora-temp .term { font-size: 0.78rem; }
+
+.prvs-ora-sky {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--inchiostro-soft);
+    line-height: 1.25;
+}
 
 /* Max/min impilate nelle schede giorno della striscia esplosa */
 .prvs-giorno-temp-maxmin {
@@ -150,18 +144,6 @@ body {
     font-weight: 600;
     color: var(--inchiostro-soft);
     opacity: 1;
-}
-
-.prvs-oraria-stats {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--inchiostro-soft);
-    line-height: 1.3;
-    white-space: nowrap;
-    flex: 1;
 }
 
 /* SINTESI GIORNI SUCCESSIVI */
@@ -468,6 +450,62 @@ body {
 }
 .prvs-giorno-item:last-child { border-bottom: none; }
 
+/* ============================================================
+   MAREA — idrometro: barre orizzontali con le soglie ufficiali
+   del Centro Maree (sostenuta 80cm, molto sostenuta 110cm,
+   eccezionale 140cm), stessa card dei giorni.
+   ============================================================ */
+#prvs-fascia-marea {
+    background: var(--carta);
+    border-radius: 20px;
+    margin: 0 1rem 14px;
+    padding: 6px 16px 16px;
+    box-shadow: var(--ombra);
+}
+
+.prvs-marea-riga { padding: 12px 0; border-bottom: 1px solid var(--linea); }
+.prvs-marea-riga:last-child { border-bottom: none; }
+
+.prvs-marea-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 7px;
+}
+.prvs-marea-ora {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--inchiostro);
+}
+.prvs-marea-tipo { color: var(--inchiostro-soft); font-size: 0.78rem; margin-left: 6px; }
+.prvs-marea-cm { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 0.92rem; }
+
+.prvs-gauge {
+    position: relative;
+    height: 12px;
+    background: rgba(16,38,43,0.06);
+    border-radius: 7px;
+    overflow: visible;
+}
+.prvs-gauge-fill {
+    position: absolute; left: 0; top: 0; height: 100%;
+    border-radius: 7px; transition: width .3s ease;
+}
+.prvs-gauge-soglia {
+    position: absolute; top: -3px; width: 1px; height: 18px;
+    background: rgba(16,38,43,0.25);
+}
+.prvs-gauge-soglia::after {
+    content: attr(data-cm); position: absolute; top: -14px; left: 50%;
+    transform: translateX(-50%); font-size: 0.55rem; color: var(--inchiostro-soft);
+    white-space: nowrap;
+}
+.prvs-gauge-legenda {
+    display: flex; justify-content: space-between; margin-top: 16px;
+    font-size: 0.62rem; color: var(--inchiostro-soft);
+}
+
 .prvs-chevron {
     display: inline-block;
     font-size: 0.7rem;
@@ -497,13 +535,21 @@ body {
     scroll-snap-type: x mandatory;
 }
 .prvs-slot-scroll::-webkit-scrollbar { display: none; }
+.prvs-slot-scroll:empty { display: none; }
+.prvs-slot-scroll + .prvs-slot-scroll {
+    padding-top: 0;
+    border-top: 1px dashed var(--linea);
+    margin: 0 14px;
+    padding-left: 0;
+    padding-right: 0;
+}
 
 .prvs-slot-chip {
     background: var(--cielo);
     border: 1px solid var(--linea);
     border-radius: 14px;
     padding: 10px 10px;
-    min-width: 76px;
+    min-width: 84px;
     flex-shrink: 0;
     text-align: center;
     cursor: pointer;
@@ -530,6 +576,14 @@ body {
     color: var(--inchiostro-soft);
     margin-top: 3px;
 }
+.prvs-slot-extra {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--inchiostro-soft);
+    line-height: 1.4;
+    margin-top: 4px;
+}
+.prvs-slot-chip.selezionata .prvs-slot-extra { color: rgba(255,255,255,0.85); }
 .prvs-slot-chip.selezionata { background: var(--inchiostro); border-color: var(--inchiostro); }
 .prvs-slot-chip.selezionata .prvs-slot-h,
 .prvs-slot-chip.selezionata .prvs-slot-t,

@@ -643,7 +643,11 @@ function elaboraPrevisioni(datiGrezzi) {
         oggiStr,
         prossimeOre,
         riepilogoGiorni,
-        indiceInizioRiepilogo
+        indiceInizioRiepilogo,
+        // Picchi grezzi di marea (solo ~4/giorno, dal worker Cloudflare):
+        // servivano finora solo per allarmi/interpolazione interna, ora
+        // li esponiamo anche per la sezione "Marea" a idrometro.
+        mareaPrevisioni: datiGrezzi.mareaPrevisioni || []
     };
 }
 
