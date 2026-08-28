@@ -294,6 +294,7 @@ body {
 }
 
 .prvs-nav {
+    margin-top: 0.7rem;
     margin-bottom: 0.6rem;
 }
 
@@ -315,17 +316,15 @@ body {
     color: var(--inchiostro);
 }
 
+.prvs-attuale .term {
+    font-size: 0.92rem;
+}
+
 .prvs-attuale-caricamento,
 .prvs-caricamento {
     font-size: 0.9rem;
     color: var(--inchiostro-soft);
     font-weight: normal;
-}
-
-.prvs-attuale-previsto {
-    font-size: 0.9rem;
-    font-weight: normal;
-    color: var(--inchiostro-soft);
 }
 
 /* Riga giorno: griglia icona | testo | dati, come nella shell.

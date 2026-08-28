@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v2.34";
+const APP_VERSION = "v2.35";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -1433,9 +1433,95 @@ async function loadAll() {
   }
 }
 
+/* ============================================================
+   ANTEPRIMA PREVISIONI DI OGGI + AVVISO ALLARME IN HOME
+   Usa previsioni-data.js (lo stesso modulo dati di previsioni.html)
+   per mostrare qui la sintesi di oggi nella scheda "Previsioni della
+   settimana" e, se per oggi risulta un allarme (temporale forte,
+   nebbia persistente o acqua alta), un piccolo avviso sopra le card
+   delle stazioni.
+   Tenuta fuori dal Promise.all principale, stesso principio di Lido
+   Meteo: scarica 3 modelli meteo e la marea, più lenta delle altre
+   fonti, e non deve ritardare il resto della dashboard. */
+
+const ICONE_PREVISIONI_HOME = {
+  sun: "☀️", partly: "🌤️", cloud: "☁️", rain: "🌧️",
+  storm: "⛈️", snow: "❄️", fog: "🌫️"
+};
+
+const CATEGORIA_TESTO_HOME = {
+  sun: "Sereno", partly: "Poco nuvoloso", cloud: "Nuvoloso",
+  rain: "Pioggia", storm: "Temporale", snow: "Neve", fog: "Nebbia"
+};
+
+function updatePrevisioniPreviewUI(oggi) {
+  const icona = document.getElementById("previsioniIcon");
+  const categoria = document.getElementById("previsioniCategoria");
+  const temp = document.getElementById("previsioniTemp");
+
+  if (!oggi) {
+    icona.textContent = "📅";
+    categoria.textContent = "Previsioni non disponibili";
+    temp.textContent = "";
+    return;
+  }
+
+  icona.textContent = ICONE_PREVISIONI_HOME[oggi.sintesi.categoria] || "📅";
+  categoria.textContent = "Oggi: " + (CATEGORIA_TESTO_HOME[oggi.sintesi.categoria] || "—");
+  temp.textContent =
+    (oggi.sintesi.min != null && oggi.sintesi.max != null)
+      ? Math.round(oggi.sintesi.min) + "° / " + Math.round(oggi.sintesi.max) + "°"
+      : "";
+}
+
+function updateAllarmeUI(oggi) {
+  const el = document.getElementById("allarmeMeteo");
+
+  if (!oggi || !oggi.allarmi) {
+    el.style.display = "none";
+    return;
+  }
+
+  const messaggi = [];
+  if (oggi.allarmi.temporaleForte) {
+    messaggi.push("⚡ Temporale forte previsto oggi");
+  }
+  if (oggi.allarmi.nebbiaPersistente) {
+    messaggi.push("🌫️ Nebbia persistente prevista oggi");
+  }
+  if (oggi.allarmi.acquaAlta) {
+    const cm = oggi.mareaMassima != null ? ` · ${oggi.mareaMassima} cm` : "";
+    messaggi.push("🌊 Acqua alta prevista oggi" + cm);
+  }
+
+  if (messaggi.length === 0) {
+    el.style.display = "none";
+    return;
+  }
+
+  el.innerHTML = messaggi.join(" &middot; ");
+  el.style.display = "block";
+}
+
+async function loadPrevisioniPreview() {
+  try {
+    const previsioni = await PrevisioniData.ottieniPrevisioni();
+    const oggi = previsioni.riepilogoGiorni.find((g) => g.data === previsioni.oggiStr);
+
+    updatePrevisioniPreviewUI(oggi);
+    updateAllarmeUI(oggi);
+
+  } catch (err) {
+    console.warn("Anteprima previsioni non disponibile:", err);
+    updatePrevisioniPreviewUI(null);
+    updateAllarmeUI(null);
+  }
+}
+
 setupInteractions();
 loadStationsConfig();
 loadAll();
+loadPrevisioniPreview();
 
 // Registra il service worker per rendere la pagina installabile come
 // app (PWA): l'icona in home, l'apertura a schermo intero e l'avvio

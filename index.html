@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-<!-- ATTENZIONE: il numero "?v=2.34" qui e in app.js va aggiornato
+<!-- ATTENZIONE: il numero "?v=2.35" qui e in app.js va aggiornato
      insieme a APP_VERSION (in app.js) e CACHE_NAME (in sw.js) ad ogni
      rilascio. Senza questo numero nell'indirizzo, il browser puo'
      continuare a servire una copia di style.css dalla propria cache
@@ -25,18 +25,16 @@
      l'indirizzo del file diverso da quello precedente, obbligando il
      browser a scaricarlo di nuovo indipendentemente da qualsiasi
      intestazione di cache del server. -->
-<link rel="stylesheet" href="style.css?v=2.34">
+<link rel="stylesheet" href="style.css?v=2.35">
 </head>
 
 <body>
 
 <h1>🌊 LagunaLive</h1>
 
-<nav class="app-nav">
-    <a href="previsioni.html" class="app-nav-link">📅 Previsioni della settimana</a>
-</nav>
-
 <div id="status">Caricamento...</div>
+
+<div id="allarmeMeteo" class="alert-banner"></div>
 
 <!-- CARD 1: Temperatura -->
 <div class="card">
@@ -114,6 +112,20 @@
     <div id="airTime" class="timestamp"></div>
 </div>
 
+<!-- CARD 5: Previsioni della settimana (link + anteprima di oggi) -->
+<div class="card">
+    <h2>📅 Previsioni della settimana</h2>
+
+    <a href="previsioni.html" class="prev-preview clickable" id="previsioniPreview">
+        <span class="prev-preview-icon" id="previsioniIcon">⏳</span>
+        <span class="prev-preview-testo">
+            <span class="prev-preview-cat" id="previsioniCategoria">Caricamento previsioni…</span>
+            <span class="prev-preview-temp" id="previsioniTemp"></span>
+        </span>
+        <span class="prev-preview-arrow">›</span>
+    </a>
+</div>
+
 <div class="card">
     <h2>📡 Stazioni utilizzate</h2>
 
@@ -140,9 +152,15 @@
     </div>
 </div>
 
+<!-- Motore dati previsioni (stesso file usato da previsioni.html):
+     serve qui solo per l'anteprima "oggi" e l'avviso allarmi, nessun
+     accesso al DOM al suo interno, va caricato prima di app.js che lo
+     consuma in loadPrevisioniPreview(). -->
+<script src="previsioni-data.js"></script>
+
 <!-- Stesso numero di versione di style.css qui sopra e di
      APP_VERSION/CACHE_NAME: vedi commento su style.css per il perche'. -->
-<script src="app.js?v=2.34"></script>
+<script src="app.js?v=2.35"></script>
 
 </body>
 </html>

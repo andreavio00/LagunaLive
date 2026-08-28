@@ -244,48 +244,34 @@ let previsioniCache = null;
 
 /* ============================================================
    FASCIA 1 — Situazione attuale
-   Due parti indipendenti, ciascuna aggiornata quando la sua fonte
-   e' pronta (l'osservato arriva da Cavanis/Misericordia, il previsto
-   dal riepilogo giorni dei modelli): non c'e' bisogno di aspettare
-   entrambe per mostrare la prima.
+   Solo il dato osservato (Cavanis): il "previsto oggi" è stato
+   spostato nella home di LagunaLive (index.html), che ora mostra
+   la propria anteprima usando previsioni-data.js direttamente.
    ============================================================ */
 function renderAttualeOsservato(dati) {
     const el = document.getElementById("prvs-attuale-osservato");
     el.classList.remove("prvs-attuale-caricamento");
 
     if (!dati) {
-        el.textContent = "Dato osservato non disponibile";
+        el.textContent = "Situazione attuale non disponibile";
         return;
     }
 
-    const vento = (dati.windSpeed != null && !isNaN(dati.windSpeed) && dati.windDir != null && !isNaN(dati.windDir))
-        ? `${Math.round(dati.windSpeed * 3.6)} km/h ${Osservazioni.windDirection(dati.windDir)}`
-        : "n.d.";
+    const ora = dati.timestamp ? Osservazioni.formatTime(dati.timestamp) : null;
 
-    el.textContent = `Osservato ora: ${dati.temperature.toFixed(1)}° · ${dati.humidity.toFixed(0)}% · vento ${vento}`;
-}
-
-function renderPrevistoOggi(previsioni) {
-    const el = document.getElementById("prvs-attuale-previsto");
-    const oggi = previsioni.riepilogoGiorni.find(g => g.data === previsioni.oggiStr);
-
-    if (!oggi || oggi.sintesi.min == null || oggi.sintesi.max == null) return;
-
-    el.textContent = ` · Previsto oggi: ${Math.round(oggi.sintesi.min)}°/${Math.round(oggi.sintesi.max)}°`;
+    el.innerHTML = `Situazione attuale${ora ? ` (${ora})` : ""} ` +
+        `<span class="term">🌡️</span> ${dati.temperature.toFixed(1)}° ` +
+        `💧 ${dati.humidity.toFixed(0)}%`;
 }
 
 async function caricaSituazioneAttuale() {
     try {
-        const [cavanis, vento] = await Promise.all([
-            Osservazioni.loadCavanis(),
-            Osservazioni.loadMisericordiaWind()
-        ]);
+        const cavanis = await Osservazioni.loadCavanis();
 
         renderAttualeOsservato({
+            timestamp: cavanis.timestamp,
             temperature: cavanis.temperature,
-            humidity: cavanis.humidity,
-            windSpeed: vento.available ? vento.windSpeed : null,
-            windDir: vento.available ? vento.windDir : null
+            humidity: cavanis.humidity
         });
 
     } catch (errore) {
@@ -730,7 +716,6 @@ async function init() {
     try {
         previsioniCache = await PrevisioniData.ottieniPrevisioni();
         renderPagina(previsioniCache);
-        renderPrevistoOggi(previsioniCache);
     } catch (errore) {
         console.error("Errore nel caricamento delle previsioni:", errore);
         document.getElementById("prvs-oggi-scroll").innerHTML =
