@@ -149,6 +149,12 @@ function costruisciOraModelli(hourly, indice) {
 
         if (temp === null && code === null) continue; // modello non disponibile a quest'ora
 
+        // Temporale "forte" calcolato anche qui, per singolo modello e
+        // singola ora: prima esisteva solo a livello di fascia. Serve a
+        // capire, guardando l'ora di un modello specifico, se è proprio
+        // lui a generare l'allarme (vedi anche aggregaInFasce più sotto).
+        const temporaleForte = code !== null && cape !== null && code >= 95 && cape > 800;
+
         out[chiaveCorta] = {
             temp,
             percepita,
@@ -162,7 +168,8 @@ function costruisciOraModelli(hourly, indice) {
             cin,
             neve,
             probPioggia,
-            pressione
+            pressione,
+            temporaleForte
         };
     }
     return out;
@@ -307,6 +314,13 @@ function aggregaInFasce(oreDelGiorno, mareaPrevisioni, dataGiorno) {
             const precipTot = valori.reduce((s, v) => s + (v.precip || 0), 0);
             const ventoMax = massimo("vento");
             const capeMax = massimo("cape");
+            const pressioneMedia = media("pressione");
+            // CIN: prendiamo il minimo (il valore più negativo = meno
+            // inibizione, quindi il caso più favorevole al temporale
+            // nella fascia), coerente con "prudenza" usata altrove.
+            const cinValori = valori.map(v => v.cin).filter(x => x !== null && x !== undefined);
+            const cinMin = cinValori.length ? Math.min(...cinValori) : null;
+            const neveTot = valori.reduce((s, v) => s + (v.neve || 0), 0);
 
             // Direzione vento: prendiamo quella dell'ora con vento più forte
             // della fascia (mediare gradi circolari non avrebbe senso)
@@ -341,6 +355,9 @@ function aggregaInFasce(oreDelGiorno, mareaPrevisioni, dataGiorno) {
                 vento: ventoMax,
                 direzioneVento: direzioneVentoMax,
                 cape: capeMax,
+                pressione: pressioneMedia !== null ? Math.round(pressioneMedia) : null,
+                cin: cinMin,
+                neve: Math.round(neveTot * 10) / 10,
                 categoria: categoriaFascia,
                 temporaleForte
             };
@@ -580,7 +597,14 @@ function elaboraPrevisioni(datiGrezzi) {
             ora: o.ora,
             modelli: o.modelli,
             sintesi: sintesiPrioritaria(o.modelli),
-            marea: stimaMarea(serieMarea, new Date(o.timestamp).getTime())
+            marea: stimaMarea(serieMarea, new Date(o.timestamp).getTime()),
+            // Allarme calcolato su TUTTI i modelli di quest'ora (non solo
+            // quello prioritario mostrato in chip), stesso criterio delle
+            // fasce: serve alla UI per il piccolo indicativo sulla chip
+            // anche quando il modello prioritario da solo non lo racconta.
+            allarmi: {
+                temporaleForte: Object.values(o.modelli).some(m => m && m.temporaleForte)
+            }
         }));
 
         const temperature = oreDelGiorno

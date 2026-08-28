@@ -168,6 +168,17 @@ function momentoAllarme(fasceGiorno, campo) {
     const fasce = fasceGiorno.filter(f => f.allarmi && f.allarmi[campo]).map(f => f.label);
     return fasce.length ? " · " + fasce.join(", ") : "";
 }
+/* Piccolo indicativo sulle chip fascia/ora: l'allarme temporale è
+   calcolato su TUTTI e 3 i modelli (per prudenza), ma la chip mostra
+   solo i dati del modello prioritario. Se quello prioritario da solo
+   non lo racconterebbe (es. ARPAE sereno mentre Seamless prevede
+   temporale), questo simbolo avvisa comunque, senza invadere la card:
+   il dettaglio "chi lo dice" si vede aprendo il confronto. */
+function badgeAvviso(allarmi) {
+    if (!allarmi || !allarmi.temporaleForte) return "";
+    return `<span class="prvs-chip-avviso" title="Almeno un modello prevede temporale forte in questo intervallo">⚡</span>`;
+}
+
 function tagAllarmi(allarmi, mareaMassima = null, fasceGiorno = null) {
     if (!allarmi) return "";
     const pezzi = [];
@@ -424,7 +435,7 @@ function apriGiorno(previsioni, giorno, item) {
         const chip = document.createElement("div");
         chip.className = "prvs-slot-chip";
         chip.innerHTML = `
-            <div class="prvs-slot-h">${String(oraDett.ora).padStart(2, "0")}:00</div>
+            <div class="prvs-slot-h">${String(oraDett.ora).padStart(2, "0")}:00${badgeAvviso(oraDett.allarmi)}</div>
             ${iconaPer(oraDett.sintesi ? oraDett.sintesi.categoria : null, "chiaro", oraDett.ora)}
             <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
             <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
@@ -457,7 +468,7 @@ function apriGiorno(previsioni, giorno, item) {
         const chip = document.createElement("div");
         chip.className = "prvs-slot-chip";
         chip.innerHTML = `
-            <div class="prvs-slot-h">${fascia.label}</div>
+            <div class="prvs-slot-h">${fascia.label}${badgeAvviso(fascia.allarmi)}</div>
             ${iconaPer(fascia.sintesi ? fascia.sintesi.categoria : null, "chiaro", oraRappresentativa)}
             <div class="prvs-slot-t num">${rappresentativo ? rappresentativo.temp + "°" : "—"}</div>
             <div class="prvs-slot-mm">☂️ ${rappresentativo ? (rappresentativo.precip ?? 0) + "mm" : "—"}</div>
@@ -507,16 +518,59 @@ function formattaValore(modello, campo, unita, arrotonda = false) {
     return (arrotonda ? Math.round(v) : v) + unita;
 }
 
+/* Direzione vento in testo (Bora/Scirocco/punto cardinale), "n.d." se
+   il modello manca o non ha il dato — stessa funzione già usata per
+   il campo opzionale "vento" nelle chip. */
+function formattaDirezione(modello) {
+    if (!modello) return "n.d.";
+    const g = modello.direzioneVento;
+    if (g === null || g === undefined) return "n.d.";
+    return direzioneNome(g) || `${Math.round(g)}°`;
+}
+
+/* Cella "Rischio temporale forte": evidenziata in rosso quando è
+   proprio QUEL modello a generare l'allarme (weathercode≥95 e
+   cape>800 in quell'ora/fascia) — così, se l'allarme in cima alla
+   scheda non si vede nei dati del modello prioritario, qui si capisce
+   subito quale modello lo sta prevedendo. */
+function cellaTemporale(modello) {
+    if (!modello) return `<td>n.d.</td>`;
+    return modello.temporaleForte
+        ? `<td class="prvs-cella-allarme">⚡ Sì</td>`
+        : `<td>—</td>`;
+}
+
 function mostraConfrontoInline(container, titolo, arpae, ecmwf, seamless, confrontoA, confrontoB) {
+    // Colonne dinamiche: se un modello manca del tutto per questa ora/
+    // fascia (tipicamente ARPAE oltre le 72h), la sua colonna viene
+    // tolta invece di restare piena di "n.d." — l'intestazione (tag
+    // sopra la tabella) già diceva "solo 2 modelli", ora lo dice anche
+    // la tabella.
+    const colonne = [
+        { label: "ARPAE", modello: arpae },
+        { label: "ECMWF", modello: ecmwf },
+        { label: "Seamless", modello: seamless }
+    ].filter(c => c.modello);
+
     const riga = (etichetta, campo, unita, arrotonda = false) => `
         <tr>
             <td>${etichetta}</td>
-            <td>${formattaValore(arpae, campo, unita, arrotonda)}</td>
-            <td>${formattaValore(ecmwf, campo, unita, arrotonda)}</td>
-            <td>${formattaValore(seamless, campo, unita, arrotonda)}</td>
+            ${colonne.map(c => `<td>${formattaValore(c.modello, campo, unita, arrotonda)}</td>`).join("")}
         </tr>
     `;
-    const tagModelli = arpae ? "ARPAE · ECMWF · Seamless" : "ECMWF · Seamless";
+    const rigaTemporale = `
+        <tr>
+            <td>Rischio temporale forte</td>
+            ${colonne.map(c => cellaTemporale(c.modello)).join("")}
+        </tr>
+    `;
+    const rigaDirezione = `
+        <tr>
+            <td>Direz. vento</td>
+            ${colonne.map(c => `<td>${formattaDirezione(c.modello)}</td>`).join("")}
+        </tr>
+    `;
+    const tagModelli = colonne.map(c => c.label).join(" · ");
     container.innerHTML = `
         <div class="prvs-slot-dettaglio">
             <div class="prvs-slot-dettaglio-head">
@@ -527,9 +581,7 @@ function mostraConfrontoInline(container, titolo, arpae, ecmwf, seamless, confro
                 <thead>
                     <tr>
                         <th>Voce</th>
-                        <th>ARPAE</th>
-                        <th>ECMWF</th>
-                        <th>Seamless</th>
+                        ${colonne.map(c => `<th>${c.label}</th>`).join("")}
                     </tr>
                 </thead>
                 <tbody>
@@ -538,9 +590,11 @@ function mostraConfrontoInline(container, titolo, arpae, ecmwf, seamless, confro
                     ${riga("Umidità", "umidita", "%")}
                     ${riga("Pioggia", "precip", "mm")}
                     ${riga("Vento", "vento", "km/h", true)}
+                    ${rigaDirezione}
                     ${riga("Pressione", "pressione", "hPa", true)}
                     ${riga("CIN", "cin", " J/kg")}
                     ${riga("Neve", "neve", "cm")}
+                    ${rigaTemporale}
                 </tbody>
             </table>
             ${rigaConcordanza(confrontoA, confrontoB)}
@@ -557,7 +611,7 @@ const MODELLI_SCELTA = [
     { id: "auto", label: "Automatico (ARPAE → ECMWF → Seamless)" },
     { id: "arpae", label: "ARPAE (locale)" },
     { id: "ecmwf", label: "ECMWF (globale)" },
-    { id: "icon", label: "Météo-France Seamless" }
+    { id: "icon", label: "ICON Seamless (DWD)" }
 ];
 
 function costruisciSceltaModello() {

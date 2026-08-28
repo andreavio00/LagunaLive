@@ -522,7 +522,14 @@ body {
     transition: max-height .25s ease, opacity .2s ease;
 }
 .prvs-giorno-item.aperto .prvs-giorno-espansione {
-    max-height: 600px;
+    /* Prima era 600px, fisso: con le chip orarie + tabella di confronto
+       (10 voci + intestazione + concordanza) il contenuto reale supera
+       facilmente quella soglia e la card tagliava le ultime righe senza
+       dare segno di scroll. Valore alto "a schermo libero": il trucco
+       dell'accordion CSS (max-height 0 → un valore fisso) funziona lo
+       stesso, basta che il valore fisso sia sempre più grande del
+       contenuto reale, mai che lo limiti. */
+    max-height: 4000px;
     opacity: 1;
     border-top: 1px solid var(--linea);
 }
@@ -686,6 +693,27 @@ body {
     font-weight: 700;
     font-family: -apple-system, sans-serif;
 }
+
+/* Cella che genera l'allarme temporale nel confronto: stesso rosso
+   del tag "Temporale forte", per riconoscerla subito. */
+.prvs-table-oraria td.prvs-cella-allarme {
+    background: var(--nizioleto);
+    color: #fff;
+    font-weight: 700;
+    border-radius: 4px;
+}
+
+/* Piccolo indicativo (fulmine) sulle chip fascia/ora quando l'allarme
+   temporale scatta ma il modello prioritario mostrato in card non lo
+   racconta da solo. Volutamente minimo, non un badge pieno. */
+.prvs-chip-avviso {
+    display: inline-block;
+    margin-left: 3px;
+    color: var(--nizioleto);
+    font-size: 0.78rem;
+    vertical-align: text-top;
+}
+.prvs-slot-chip.selezionata .prvs-chip-avviso { color: var(--sole); }
 /* ============================================================
    BADGE ALLARMI — solo su giorni/fasce (temporale forte, nebbia
    persistente, acqua alta).
