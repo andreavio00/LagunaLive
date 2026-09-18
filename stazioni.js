@@ -22,7 +22,7 @@ const DEFAULT_VISIBLE_KEYS = new Set([
   keyOf("netatmo", "70:ee:50:2b:02:64"),
   keyOf("weathercloud", "9454656179"),
   keyOf("weathercloud", "8414577935"),
-  keyOf("weathercloud", "8732543148"),
+  keyOf("netatmo", "70:ee:50:c3:8f:28"),
   keyOf("netatmo", "70:ee:50:b4:e8:0a")
 ]);
 
@@ -72,7 +72,7 @@ const GROUPS = [
       keyOf("netatmo", "70:ee:50:af:3d:96"),
       keyOf("netatmo", "70:ee:50:bf:7e:5a"),
       keyOf("netatmo", "70:ee:50:2b:02:64"),
-      keyOf("weathercloud", "8732543148")
+      keyOf("netatmo", "70:ee:50:c3:8f:28")
     ]
   },
   {
@@ -104,6 +104,8 @@ const QUALITY_NOTES = {
     "Stazione di Sant’Alvise, presso la palestra dell’ex Ospedale Umberto I: riferimento locale principale per Cannaregio nord-ovest.",
   [keyOf("netatmo", "70:ee:50:a4:41:c6")]:
     "Molto vicina a Santa Caterina e priva di pluviometro: utile soprattutto per confrontare temperatura e umidità a Cannaregio.",
+  [keyOf("netatmo", "70:ee:50:c3:8f:28")]:
+    "Copre Santa Croce; non dispone di pluviometro né anemometro, ma completa il confronto di temperatura e umidità nel centro storico.",
   [keyOf("weathercloud", "2361312782")]:
     "Stazione di confronto per Murano: verificare la coerenza della pioggia con TcMurano durante gli eventi.",
   [keyOf("netatmo", "70:ee:50:af:81:0c")]:
@@ -114,8 +116,6 @@ const QUALITY_NOTES = {
     "Copertura geografica preziosa, ma lo storico recente è discontinuo.",
   [keyOf("weathercloud", "8414577935")]:
     "Secondaria rispetto alla stazione ufficiale del Lido; utile per il dettaglio locale.",
-  [keyOf("weathercloud", "8732543148")]:
-    "Aggiornamenti e storico meno regolari; quota e pressione dichiarate richiedono cautela.",
   [keyOf("netatmo", "70:ee:50:b5:49:38")]:
     "Non rappresenta Venezia insulare: serve soltanto come possibile segnale di un fronte in arrivo da ovest o nord-ovest."
 };
