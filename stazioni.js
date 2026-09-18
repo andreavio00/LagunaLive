@@ -154,7 +154,7 @@ const sourceWarning = document.getElementById("sourceWarning");
 
 async function fetchStationList(url) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
   let response;
 
   try {
