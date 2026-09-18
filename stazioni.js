@@ -2,6 +2,8 @@ const NETATMO_URL =
   "https://netatmo-worker.andrea-vio.workers.dev/netatmo/selected?includeOptional=1";
 const WEATHERCLOUD_URL =
   "https://weathercloude-worker.andrea-vio.workers.dev/weathercloud/selected";
+const WUNDERGROUND_URL =
+  "https://weathercloude-worker.andrea-vio.workers.dev/wunderground/selected";
 
 const VIEW_STORAGE_KEY = "lagunalive-amateur-show-all-v1";
 const GROUP_STORAGE_KEY = "lagunalive-amateur-expanded-groups-v1";
@@ -10,9 +12,8 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const keyOf = (source, id) => `${source}|${id}`;
 
 const DEFAULT_VISIBLE_KEYS = new Set([
+  keyOf("wunderground", "IVENIC160"),
   keyOf("weathercloud", "2414314087"),
-  keyOf("netatmo", "70:ee:50:3e:ee:22"),
-  keyOf("netatmo", "70:ee:50:a4:41:c6"),
   keyOf("weathercloud", "2591958863"),
   keyOf("weathercloud", "2361312782"),
   keyOf("netatmo", "70:ee:50:af:5a:52"),
@@ -20,6 +21,8 @@ const DEFAULT_VISIBLE_KEYS = new Set([
   keyOf("netatmo", "70:ee:50:bf:7e:5a"),
   keyOf("netatmo", "70:ee:50:2b:02:64"),
   keyOf("weathercloud", "9454656179"),
+  keyOf("weathercloud", "8414577935"),
+  keyOf("weathercloud", "8732543148"),
   keyOf("netatmo", "70:ee:50:b4:e8:0a")
 ]);
 
@@ -28,8 +31,9 @@ const GROUPS = [
     id: "cannaregio",
     title: "Cannaregio",
     shortTitle: "Cannaregio",
-    areaClass: "area-city",
+    areaClass: "area-cannaregio",
     keys: [
+      keyOf("wunderground", "IVENIC160"),
       keyOf("weathercloud", "2414314087"),
       keyOf("netatmo", "70:ee:50:3e:ee:22"),
       keyOf("netatmo", "70:ee:50:a4:41:c6")
@@ -39,7 +43,7 @@ const GROUPS = [
     id: "murano",
     title: "Murano",
     shortTitle: "Murano",
-    areaClass: "area-north",
+    areaClass: "area-murano",
     keys: [
       keyOf("weathercloud", "2591958863"),
       keyOf("weathercloud", "2361312782"),
@@ -47,49 +51,35 @@ const GROUPS = [
     ]
   },
   {
-    id: "laguna-nord",
-    title: "Laguna nord",
-    shortTitle: "Laguna nord",
-    areaClass: "area-north",
+    id: "laguna",
+    title: "Laguna e litorale",
+    shortTitle: "Laguna",
+    areaClass: "area-lagoon",
     keys: [
       keyOf("netatmo", "70:ee:50:af:5a:52"),
-      keyOf("netatmo", "70:ee:50:2a:dd:e8")
-    ]
-  },
-  {
-    id: "centro-storico",
-    title: "Centro storico",
-    shortTitle: "Centro",
-    areaClass: "area-city",
-    keys: [
-      keyOf("netatmo", "70:ee:50:af:3d:96"),
-      keyOf("netatmo", "70:ee:50:bf:7e:5a"),
-      keyOf("netatmo", "70:ee:50:2b:02:64")
-    ]
-  },
-  {
-    id: "lido-sud",
-    title: "Lido e laguna sud",
-    shortTitle: "Lido e sud",
-    areaClass: "area-south",
-    keys: [
+      keyOf("netatmo", "70:ee:50:2a:dd:e8"),
       keyOf("weathercloud", "9454656179"),
       keyOf("weathercloud", "8414577935"),
       keyOf("netatmo", "70:ee:50:b4:e8:0a")
     ]
   },
   {
-    id: "giudecca",
-    title: "Giudecca",
-    shortTitle: "Giudecca",
-    areaClass: "area-special",
-    keys: [keyOf("weathercloud", "8732543148")]
+    id: "centro-storico",
+    title: "Venezia centro",
+    shortTitle: "Venezia centro",
+    areaClass: "area-center",
+    keys: [
+      keyOf("netatmo", "70:ee:50:af:3d:96"),
+      keyOf("netatmo", "70:ee:50:bf:7e:5a"),
+      keyOf("netatmo", "70:ee:50:2b:02:64"),
+      keyOf("weathercloud", "8732543148")
+    ]
   },
   {
     id: "sentinella",
     title: "Sentinella terraferma",
     shortTitle: "Sentinella",
-    areaClass: "area-special",
+    areaClass: "area-sentinel",
     keys: [keyOf("netatmo", "70:ee:50:b5:49:38")]
   }
 ];
@@ -110,6 +100,8 @@ const AUTO_FALLBACKS = [
 ];
 
 const QUALITY_NOTES = {
+  [keyOf("wunderground", "IVENIC160")]:
+    "Stazione di Sant’Alvise, presso la palestra dell’ex Ospedale Umberto I: riferimento locale principale per Cannaregio nord-ovest.",
   [keyOf("netatmo", "70:ee:50:a4:41:c6")]:
     "Molto vicina a Santa Caterina e priva di pluviometro: utile soprattutto per confrontare temperatura e umidità a Cannaregio.",
   [keyOf("weathercloud", "2361312782")]:
@@ -190,10 +182,11 @@ async function loadStations({ manual = false } = {}) {
 
   const results = await Promise.allSettled([
     fetchStationList(NETATMO_URL),
-    fetchStationList(WEATHERCLOUD_URL)
+    fetchStationList(WEATHERCLOUD_URL),
+    fetchStationList(WUNDERGROUND_URL)
   ]);
 
-  const sourceNames = ["Netatmo", "Weathercloud"];
+  const sourceNames = ["Netatmo", "Weathercloud", "Weather Underground"];
   const loaded = [];
   const errors = [];
 
@@ -376,12 +369,11 @@ function renderStationCard(station) {
   const roleClass = ROLE_LABELS[station.networkRole]
     ? station.networkRole
     : "supporto";
-  const sourceLabel = station.source === "weathercloud"
-    ? "Weathercloud"
-    : "Netatmo";
-  const sourceClass = station.source === "weathercloud"
-    ? "weathercloud"
-    : "netatmo";
+  const sourceMeta = {
+    netatmo: { label: "Netatmo", className: "netatmo" },
+    weathercloud: { label: "Weathercloud", className: "weathercloud" },
+    wunderground: { label: "W. Underground", className: "wunderground" }
+  }[station.source] || { label: station.source || "Fonte", className: "other" };
   const freshness = freshnessInfo(station);
   const detailsId = `details-${String(station.networkOrder).replace(/[^0-9]/g, "")}`;
   const qualityNote = QUALITY_NOTES[station.key];
@@ -404,7 +396,7 @@ function renderStationCard(station) {
           <div class="station-sector">${escapeHtml(station.sector || station.location || "")}</div>
         </div>
         <div class="station-badges">
-          <span class="badge badge-source-${sourceClass}">${sourceLabel}</span>
+          <span class="badge badge-source-${escapeHtml(sourceMeta.className)}">${escapeHtml(sourceMeta.label)}</span>
           <span class="badge badge-role">${escapeHtml(role)}</span>
         </div>
       </div>
