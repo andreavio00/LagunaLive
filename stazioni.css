@@ -573,6 +573,112 @@ button {
   }
 }
 
+@media (max-width: 619px) {
+  .page-shell {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .zone-nav {
+    margin-left: -8px;
+    margin-right: -8px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .station-group {
+    padding: 8px;
+  }
+
+  .station-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .station-card {
+    padding: 8px 7px 7px;
+    border-left-width: 4px;
+    border-radius: 11px;
+  }
+
+  .station-head {
+    display: block;
+  }
+
+  .station-title h3 {
+    font-size: 0.78rem;
+  }
+
+  .station-sector {
+    font-size: 0.59rem;
+  }
+
+  .station-badges {
+    justify-content: flex-start;
+    max-width: none;
+    margin-top: 5px;
+  }
+
+  .badge {
+    padding: 2px 5px;
+    font-size: 0.52rem;
+  }
+
+  .freshness {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-top: 5px;
+    font-size: 0.58rem;
+  }
+
+  .auto-shown {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .metric-grid {
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .metric {
+    padding: 5px 4px;
+    border-radius: 7px;
+  }
+
+  .metric-label {
+    min-height: 2.2em;
+    font-size: 0.52rem;
+  }
+
+  .metric-value,
+  .metric-temperature .metric-value {
+    font-size: 0.82rem;
+    white-space: normal;
+  }
+
+  .station-alert,
+  .quality-note {
+    font-size: 0.6rem;
+  }
+
+  .details-toggle {
+    padding: 5px 2px;
+    font-size: 0.61rem;
+  }
+
+  .detail-row {
+    display: block;
+    font-size: 0.62rem;
+  }
+
+  .detail-row strong {
+    display: block;
+    margin-top: 1px;
+    text-align: left;
+  }
+}
+
 @media (max-width: 410px) {
   .page-header {
     padding-left: 15px;
