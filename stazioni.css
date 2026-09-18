@@ -263,16 +263,44 @@ button {
 }
 
 .station-group {
+  --group-border: #9aabba;
+  --group-heading: var(--navy);
   padding: 12px;
-  border: 1px solid #dce5ed;
+  border: 2px solid var(--group-border);
+  border-top-width: 5px;
   border-radius: 16px;
   scroll-margin-top: 12px;
 }
 
-.area-city { background: rgba(234, 241, 251, 0.7); }
-.area-north { background: rgba(232, 245, 242, 0.72); }
-.area-south { background: rgba(255, 244, 223, 0.72); }
-.area-special { background: rgba(238, 241, 244, 0.76); }
+.area-cannaregio {
+  --group-border: #2768b2;
+  --group-heading: #174f8f;
+  background: rgba(231, 241, 253, 0.78);
+}
+
+.area-murano {
+  --group-border: #23877c;
+  --group-heading: #176a62;
+  background: rgba(228, 246, 242, 0.78);
+}
+
+.area-lagoon {
+  --group-border: #2b96b8;
+  --group-heading: #167493;
+  background: rgba(226, 245, 250, 0.8);
+}
+
+.area-center {
+  --group-border: #9960ad;
+  --group-heading: #754188;
+  background: rgba(247, 237, 250, 0.78);
+}
+
+.area-sentinel {
+  --group-border: #7d8995;
+  --group-heading: #596572;
+  background: rgba(238, 241, 244, 0.82);
+}
 
 .group-header {
   display: flex;
@@ -284,7 +312,7 @@ button {
 
 .group-header h2 {
   margin: 0;
-  color: var(--navy);
+  color: var(--group-heading);
   font-size: 1.02rem;
 }
 
@@ -381,6 +409,22 @@ button {
 .badge-source-weathercloud {
   color: #655192;
   background: #f0ebfa;
+}
+
+.badge-source-wunderground {
+  color: #7c3219;
+  background: #fde9df;
+}
+
+.badge-source-other {
+  color: #4d5966;
+  background: #edf1f4;
+}
+
+.group-colour-note {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .badge-role {
