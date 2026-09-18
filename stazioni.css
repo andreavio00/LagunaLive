@@ -49,10 +49,12 @@ button {
 }
 
 .brand {
+  display: inline-block;
   color: var(--navy);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+  text-decoration: none;
 }
 
 .page-header h1 {
@@ -480,7 +482,8 @@ button {
 
 .metric-temperature .metric-value {
   color: var(--blue);
-  font-size: 1.25rem;
+  font-size: 1.36rem;
+  font-weight: 800;
 }
 
 .metric-empty .metric-value {
@@ -695,9 +698,14 @@ button {
     font-size: 0.52rem;
   }
 
-  .metric-value,
-  .metric-temperature .metric-value {
+  .metric-value {
     font-size: 0.82rem;
+    white-space: normal;
+  }
+
+  .metric-temperature .metric-value {
+    font-size: 1rem;
+    font-weight: 800;
     white-space: normal;
   }
 

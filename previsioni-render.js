@@ -16,7 +16,7 @@ const ICON_PATH = "icons/";
 // incrociata). Va tenuto allineato manualmente a CACHE_NAME/
 // SHELL_FILES in sw.js e ai "?v=..." qui in previsioni.html ad
 // ogni rilascio.
-const PRVS_VERSION = "v3.2";
+const PRVS_VERSION = "v3.3";
 
 /* ============================================================
    PREFERENZE UTENTE — modello principale + campi opzionali nel

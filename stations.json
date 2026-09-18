@@ -25,12 +25,12 @@
       "measures": ["temperature", "humidity", "pressure"]
     },
     {
-      "id": "san_giorgio",
-      "name": "San Giorgio",
-      "type": "cpsm",
+      "id": "cannaregio_palestra",
+      "name": "Cannaregio – Palestra Marsico",
+      "type": "wunderground",
       "role": "urban",
-      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html",
-      "measures": ["temperature", "humidity", "wind"]
+      "url": "https://www.wunderground.com/dashboard/pws/IVENIC160",
+      "measures": ["temperature", "humidity", "wind", "rain", "pressure"]
     },
     {
       "id": "cavanis",

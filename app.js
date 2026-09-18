@@ -2,10 +2,15 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v3.2";
+const APP_VERSION = "v3.3";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
+
+const PALESTRA_WORKER_URL =
+  "https://weathercloude-worker.andrea-vio.workers.dev/wunderground/selected";
+const PALESTRA_SOURCE_URL =
+  "https://www.wunderground.com/dashboard/pws/IVENIC160";
 
 // Worker Cloudflare personale dell'utente (generico: accetta qualsiasi
 // URL consentito tramite ?url=, con allowlist di dominio lato Worker
@@ -144,6 +149,30 @@ function formatTime(timestamp) {
       minute: "2-digit"
     }
   );
+}
+
+function formatEpochTime(epochMs) {
+
+  const date = new Date(Number(epochMs));
+
+  if (isNaN(date.getTime())) return null;
+
+  return date.toLocaleTimeString(
+    "it-IT",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Rome"
+    }
+  );
+}
+
+function numberOrNull(value) {
+
+  if (value === null || value === undefined || value === "") return null;
+
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 // Le tabelle del Comune riportano sempre l'ora solare (UTC+1, tutto
@@ -527,6 +556,48 @@ async function loadSanGiorgio() {
   };
 }
 
+// La Palestra Marsico viene letta dal worker gia' usato dalla pagina
+// delle stazioni amatoriali. Rimane separata dal caricamento principale:
+// se Weather Underground non risponde, le altre card continuano a
+// funzionare e soltanto queste due righe mostrano "n.d.".
+async function loadCannaregioPalestra() {
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+
+  try {
+
+    const response = await fetch(PALESTRA_WORKER_URL, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const payload = await response.json();
+    const station = Array.isArray(payload)
+      ? payload.find(item => item.id === "IVENIC160")
+      : null;
+
+    if (!station || station.error) {
+      throw new Error(station?.error || "Stazione non trovata");
+    }
+
+    return {
+      available: true,
+      temperature: numberOrNull(station.temp),
+      humidity: numberOrNull(station.humidity),
+      updatedAt: numberOrNull(station.updatedAt),
+      stale: Boolean(station.stale)
+    };
+
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function loadCavanis() {
 
   const response = await fetch(CAVANIS_API_URL);
@@ -869,6 +940,11 @@ async function loadStationsConfig() {
 
       if (station.type === "isprambiente") {
         openLidoMeteoModal();
+        return;
+      }
+
+      if (station.type === "wunderground") {
+        window.open(station.url, "_blank", "noopener");
         return;
       }
 
@@ -1216,8 +1292,8 @@ function setupInteractions() {
     openStationModal("Palazzo Cavalli", PALAZZO_CAVALLI_URL, PALAZZO_CAVALLI_LABELS);
   });
 
-  document.getElementById("subSanGiorgio").addEventListener("click", () => {
-    openStationModal("San Giorgio", SAN_GIORGIO_URL, SAN_GIORGIO_LABELS);
+  document.getElementById("subPalestra").addEventListener("click", () => {
+    window.open(PALESTRA_SOURCE_URL, "_blank", "noopener");
   });
 
   document.getElementById("mareLink").addEventListener("click", () => {
@@ -1262,6 +1338,33 @@ function updateLidoMeteoUI(lidoMeteo) {
       : "Lido: n.d.";
 }
 
+function updateCannaregioPalestraUI(palestra) {
+
+  const time = palestra.available && palestra.updatedAt != null
+    ? formatEpochTime(palestra.updatedAt)
+    : null;
+  const timeText = time ? " (" + time + ")" : "";
+  const staleText = palestra.stale
+    ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>'
+    : "";
+
+  document.getElementById("subPalestra").innerHTML =
+    palestra.available && palestra.temperature != null
+      ? "Cannaregio – Palestra: " + palestra.temperature.toFixed(1) +
+        " °C" + timeText + staleText
+      : "Cannaregio – Palestra: n.d.";
+
+  document.getElementById("humidityPalestra").innerHTML =
+    palestra.available && palestra.humidity != null
+      ? "Cannaregio – Palestra: " + palestra.humidity.toFixed(0) +
+        " %" + timeText +
+        (palestra.temperature != null
+          ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(palestra.temperature, palestra.humidity).toFixed(1)} °C</span>`
+          : "") +
+        staleText
+      : "Cannaregio – Palestra: n.d.";
+}
+
 async function loadAll() {
 
   document.getElementById("status").innerHTML = "Caricamento...";
@@ -1290,9 +1393,15 @@ async function loadAll() {
         updateLidoMeteoUI({ available: false });
       });
 
-    const [cavalli, sanGiorgio, cavanis, puntaSalute, misericordiaWind] = await Promise.all([
+    loadCannaregioPalestra()
+      .then(updateCannaregioPalestraUI)
+      .catch(err => {
+        console.warn("Cannaregio – Palestra: dati non disponibili", err);
+        updateCannaregioPalestraUI({ available: false, stale: false });
+      });
+
+    const [cavalli, cavanis, puntaSalute, misericordiaWind] = await Promise.all([
       loadPalazzoCavalli(),
-      loadSanGiorgio(),
       loadCavanis(),
       loadTide(),
       loadMisericordiaWind()
@@ -1309,10 +1418,6 @@ async function loadAll() {
     document.getElementById("subCavalli").innerHTML =
       "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
       " °C (" + formatTime(cavalli.timestamp) + ")";
-
-    document.getElementById("subSanGiorgio").innerHTML =
-      "San Giorgio: " + sanGiorgio.temperature.toFixed(1) +
-      " °C (" + formatTime(sanGiorgio.timestamp) + ")";
 
     // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
 
@@ -1363,11 +1468,8 @@ async function loadAll() {
     document.getElementById("humidityCavalli").innerHTML =
       `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`;
 
-    document.getElementById("humiditySanGiorgio").innerHTML =
-      `San Giorgio: ${sanGiorgio.humidity.toFixed(0)} % (${formatTime(sanGiorgio.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(sanGiorgio.temperature, sanGiorgio.humidity).toFixed(1)} °C</span>`;
-    // humidityLidoMeteo viene aggiornato da updateLidoMeteoUI(),
-    // indipendentemente da questo blocco (vedi commento piu' sopra sul
-    // perche' Lido Meteo e' escluso dal Promise.all principale).
+    // humidityLidoMeteo e humidityPalestra vengono aggiornati dai
+    // rispettivi caricamenti indipendenti (vedi commenti sopra).
 
     // --- Card 3: mare ---
 
