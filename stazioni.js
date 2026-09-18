@@ -51,6 +51,18 @@ const GROUPS = [
     ]
   },
   {
+    id: "centro-storico",
+    title: "Venezia centro",
+    shortTitle: "Venezia centro",
+    areaClass: "area-center",
+    keys: [
+      keyOf("netatmo", "70:ee:50:af:3d:96"),
+      keyOf("netatmo", "70:ee:50:bf:7e:5a"),
+      keyOf("netatmo", "70:ee:50:2b:02:64"),
+      keyOf("netatmo", "70:ee:50:c3:8f:28")
+    ]
+  },
+  {
     id: "laguna",
     title: "Laguna e litorale",
     shortTitle: "Laguna",
@@ -61,18 +73,6 @@ const GROUPS = [
       keyOf("weathercloud", "9454656179"),
       keyOf("weathercloud", "8414577935"),
       keyOf("netatmo", "70:ee:50:b4:e8:0a")
-    ]
-  },
-  {
-    id: "centro-storico",
-    title: "Venezia centro",
-    shortTitle: "Venezia centro",
-    areaClass: "area-center",
-    keys: [
-      keyOf("netatmo", "70:ee:50:af:3d:96"),
-      keyOf("netatmo", "70:ee:50:bf:7e:5a"),
-      keyOf("netatmo", "70:ee:50:2b:02:64"),
-      keyOf("netatmo", "70:ee:50:c3:8f:28")
     ]
   },
   {
