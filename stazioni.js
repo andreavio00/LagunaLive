@@ -12,6 +12,7 @@ const keyOf = (source, id) => `${source}|${id}`;
 const DEFAULT_VISIBLE_KEYS = new Set([
   keyOf("weathercloud", "2414314087"),
   keyOf("netatmo", "70:ee:50:3e:ee:22"),
+  keyOf("netatmo", "70:ee:50:a4:41:c6"),
   keyOf("weathercloud", "2591958863"),
   keyOf("weathercloud", "2361312782"),
   keyOf("netatmo", "70:ee:50:af:5a:52"),
@@ -30,7 +31,8 @@ const GROUPS = [
     areaClass: "area-city",
     keys: [
       keyOf("weathercloud", "2414314087"),
-      keyOf("netatmo", "70:ee:50:3e:ee:22")
+      keyOf("netatmo", "70:ee:50:3e:ee:22"),
+      keyOf("netatmo", "70:ee:50:a4:41:c6")
     ]
   },
   {
@@ -108,6 +110,8 @@ const AUTO_FALLBACKS = [
 ];
 
 const QUALITY_NOTES = {
+  [keyOf("netatmo", "70:ee:50:a4:41:c6")]:
+    "Molto vicina a Santa Caterina e priva di pluviometro: utile soprattutto per confrontare temperatura e umidità a Cannaregio.",
   [keyOf("weathercloud", "2361312782")]:
     "Stazione di confronto per Murano: verificare la coerenza della pioggia con TcMurano durante gli eventi.",
   [keyOf("netatmo", "70:ee:50:af:81:0c")]:
@@ -413,12 +417,9 @@ function renderStationCard(station) {
 
       <div class="metric-grid">
         ${metricCell("Temperatura", formatTemperature(station.temp), "metric-temperature")}
-        ${metricCell(
-          station.source === "netatmo" ? "Pioggia 24 h" : "Pioggia accum.",
-          formatUnit(station.rainAccum, "mm", 2)
-        )}
-        ${metricCell("Vento", formatUnit(station.windKmh, "km/h", 1))}
-        ${metricCell("Raffica", formatUnit(station.gustKmh, "km/h", 1))}
+        ${metricCell("Umidità", formatUnit(station.humidity, "%", 0))}
+        ${metricCell("Pioggia ora", formatUnit(station.rainRate, "mm/h", 2))}
+        ${metricCell("Pioggia 24 h", formatUnit(station.rainAccum, "mm", 2))}
       </div>
 
       ${alert}
@@ -446,6 +447,8 @@ function renderDetails(station) {
     ["Pressione", formatUnit(station.pressure, "hPa", 1)],
     ["Intensità pioggia", formatUnit(station.rainRate, "mm/h", 2)],
     ["Pioggia ultima ora", formatUnit(station.rain60min, "mm", 2)],
+    ["Vento", formatUnit(station.windKmh, "km/h", 1)],
+    ["Raffica", formatUnit(station.gustKmh, "km/h", 1)],
     ["Direzione vento", formatWindDirection(station.windDir)],
     ["Quota", formatUnit(station.altitude, "m", 0)],
     ["Ultimo dato", formatDateTime(station.updatedAt)],
