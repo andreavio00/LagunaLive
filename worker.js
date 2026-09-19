@@ -5,9 +5,9 @@
 //
 // A differenza della prima versione (fissa sul solo file ISPRA),
 // questa accetta qualsiasi URL tramite il parametro ?url=, cosi' lo
-// stesso Worker serve sia il file Dati2.xml di ISPRA sia le 4 pagine
-// CPSM del Comune di Venezia (Palazzo Cavalli, San Giorgio, Punta
-// Salute, Misericordia), al posto di r.jina.ai (che applica
+// stesso Worker serve il file Dati2.xml di ISPRA, le 4 pagine CPSM
+// del Comune di Venezia (Palazzo Cavalli, San Giorgio, Punta Salute,
+// Misericordia) e l'API ARPA di Cavanis, al posto di r.jina.ai (che applica
 // un'elaborazione "leggibilita'" pensata per articoli, non adatta a
 // tabelle/dati grezzi, ed e' risultato piu' lento in pratica).
 //
@@ -21,7 +21,8 @@ const ALLOWED_HOSTS = [
   "www.comune.venezia.it",
   "comune.venezia.it",
   "www.venezia.isprambiente.it",
-  "venezia.isprambiente.it"
+  "venezia.isprambiente.it",
+  "api.arpa.veneto.it"
 ];
 
 // Usato solo se la richiesta non specifica ?url= (compatibilita' con

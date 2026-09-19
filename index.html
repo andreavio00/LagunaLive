@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-<!-- ATTENZIONE: il numero "?v=3.9" qui e in app.js va aggiornato
+<!-- ATTENZIONE: il numero "?v=4.1" qui e in app.js va aggiornato
      insieme a APP_VERSION (in app.js) e CACHE_NAME (in sw.js) ad ogni
      rilascio. Senza questo numero nell'indirizzo, il browser puo'
      continuare a servire una copia di style.css dalla propria cache
@@ -25,7 +25,7 @@
      l'indirizzo del file diverso da quello precedente, obbligando il
      browser a scaricarlo di nuovo indipendentemente da qualsiasi
      intestazione di cache del server. -->
-<link rel="stylesheet" href="style.css?v=3.9">
+<link rel="stylesheet" href="style.css?v=4.1">
 </head>
 
 <body>
@@ -37,7 +37,7 @@
 <div id="allarmeMeteo" class="alert-banner"></div>
 
 <!-- CARD 1: Temperatura -->
-<div class="card">
+<div class="card home-card card-temperature">
     <h2>🌡️ Temperatura</h2>
 
     <div class="main-temp clickable" id="mainTempLink">
@@ -53,7 +53,7 @@
 </div>
 
 <!-- CARD 2: Umidità e percepita -->
-<div class="card">
+<div class="card home-card card-humidity">
     <div class="card-icon">💧</div>
 
     <div class="triple-metric">
@@ -83,7 +83,7 @@
 </div>
 
 <!-- CARD 3: Mare -->
-<div class="card">
+<div class="card home-card card-sea">
     <h2>🌊 Mare</h2>
 
     <div class="mare-main clickable" id="mareLink">
@@ -95,12 +95,12 @@
 </div>
 
 <!-- CARD 4: Vento, pioggia, pressione -->
-<div class="card">
+<div class="card home-card card-weather">
     <div class="metric-line clickable" id="windLine">
         <span class="metric-name">💨 Vento</span>
         <span class="metric-data" id="wind">--</span>
     </div>
-    <div class="metric-line">
+    <div class="metric-line clickable" id="rainLine">
         <span class="metric-name">🌧️ Pioggia</span>
         <span class="metric-data" id="rain">--</span>
     </div>
@@ -113,7 +113,7 @@
 </div>
 
 <!-- Collegamento alla rete di stazioni amatoriali -->
-<a href="stazioni.html" class="card amateur-stations-link">
+<a href="stazioni.html" class="card navigation-card amateur-stations-link">
     <span class="amateur-stations-icon" aria-hidden="true">📍</span>
     <span class="amateur-stations-copy">
         <strong>Stazioni amatoriali</strong>
@@ -123,7 +123,7 @@
 </a>
 
 <!-- CARD 5: Previsioni — fascia oraria attuale, come anteprima di previsioni.html -->
-<div class="card">
+<div class="card navigation-card card-forecast">
     <h2>📅 Previsioni</h2>
 
     <a href="previsioni.html" class="prev-preview clickable" id="previsioniPreview">
@@ -139,7 +139,7 @@
     </a>
 </div>
 
-<div class="card">
+<div class="card home-card card-sources">
     <h2>📡 Stazioni utilizzate</h2>
 
     <div id="stationsStatus">
@@ -158,10 +158,11 @@
 <div id="forceUpdateLink" class="force-update-link">🔄 Forza aggiornamento app</div>
 
 <!-- Modale scheda stazione -->
-<div id="modalOverlay" class="modal-overlay">
-    <div class="modal">
+<div id="modalOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" id="modalCard" data-theme="default" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <button id="modalClose" class="modal-close" aria-label="Chiudi">✕</button>
         <h2 id="modalTitle">Stazione</h2>
+        <p id="modalSubtitle" class="modal-subtitle" hidden></p>
         <div id="modalBody"></div>
     </div>
 </div>
@@ -170,11 +171,11 @@
      serve qui solo per l'anteprima "oggi" e l'avviso allarmi, nessun
      accesso al DOM al suo interno, va caricato prima di app.js che lo
      consuma in loadPrevisioniPreview(). -->
-<script src="previsioni-data.js?v=3.4"></script>
+<script src="previsioni-data.js?v=4.1"></script>
 
 <!-- Stesso numero di versione di style.css qui sopra e di
      APP_VERSION/CACHE_NAME: vedi commento su style.css per il perche'. -->
-<script src="app.js?v=3.4"></script>
+<script src="app.js?v=4.1"></script>
 
 </body>
 </html>

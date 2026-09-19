@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v3.9";
+const APP_VERSION = "v4.1";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -11,6 +11,17 @@ const PALESTRA_WORKER_URL =
   "https://weathercloude-worker.andrea-vio.workers.dev/wunderground/selected";
 const PALESTRA_SOURCE_URL =
   "https://www.wunderground.com/dashboard/pws/IVENIC160";
+
+const PALAZZO_CAVALLI_SOURCE_URL =
+  "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html";
+const SAN_GIORGIO_SOURCE_URL =
+  "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html";
+const PUNTA_SALUTE_SOURCE_URL =
+  "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html";
+const MISERICORDIA_SOURCE_URL =
+  "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html";
+const LIDO_METEO_SOURCE_URL =
+  "https://www.venezia.isprambiente.it/index.php?folder_id=2115";
 
 // Worker Cloudflare personale dell'utente (generico: accetta qualsiasi
 // URL consentito tramite ?url=, con allowlist di dominio lato Worker
@@ -26,22 +37,6 @@ const PROXY_WORKER_URL = "https://lagunalive-proxy.andrea-vio.workers.dev/";
 function proxyUrl(targetUrl) {
   return PROXY_WORKER_URL + "?url=" + encodeURIComponent(targetUrl);
 }
-
-const PALAZZO_CAVALLI_URL = proxyUrl(
-  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html"
-);
-
-const SAN_GIORGIO_URL = proxyUrl(
-  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/San_Giorgio.html"
-);
-
-const PUNTA_SALUTE_URL = proxyUrl(
-  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html"
-);
-
-const MISERICORDIA_URL = proxyUrl(
-  "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html"
-);
 
 const CAVANIS_API_URL =
   "https://api.arpa.veneto.it/REST/v1/meteo_meteogrammi_tabella?codseqst=300000154";
@@ -96,18 +91,9 @@ const PUNTA_SALUTE_LABELS = [
   "Temperatura acqua (°C)"
 ];
 
-// Etichette NON verificate su uno screenshot reale della pagina (a
-// differenza di Cavalli/San Giorgio/Punta Salute). Dedotte per
-// analogia: la pagina "10. Misericordia" del Comune elenca i sensori
-// installati come mareografo + anemometro + ondametro (niente
-// termometro/igrometro/barometro), e l'ordine delle colonne di
-// San Giorgio (verificato) segue lo stesso ordine "canonico" descritto
-// nella pagina generale dei parametri di rete (Liv, DV, VV, VVx, Pr,
-// T aria, T H2O, Um, Pg, Rs, O Hs, O Hx) filtrato ai soli sensori
-// presenti nella stazione. Marea come prima colonna dati e' gia'
-// verificato (funziona da tempo come backup marea). Le colonne vento e
-// onda sono INFERITE, non confermate: da ricontrollare al primo avvio
-// reale confrontando con le condizioni di vento note al momento.
+// Etichette verificate sulla tabella ufficiale del Comune: marea,
+// direzione e velocita' media del vento, raffica, onda significativa
+// e onda massima compaiono esattamente in quest'ordine.
 const MISERICORDIA_LABELS = [
   "Data/Ora",
   "Marea (m)",
@@ -125,13 +111,10 @@ const STATION_LABELS = {
   san_giorgio: SAN_GIORGIO_LABELS
 };
 
-// Colonne verificate direttamente su uno screenshot della scheda reale.
-// Per le stazioni non verificate (Misericordia) nascondiamo le
-// colonne extra invece di etichettarle genericamente "Colonna N", che
-// non da' nessuna informazione utile.
+// Colonne verificate direttamente sulle tabelle pubblicate dalle fonti.
 const STATION_LABELS_VERIFIED = {
   punta_salute: true,
-  misericordia: false,
+  misericordia: true,
   palazzo_cavalli: true,
   san_giorgio: true
 };
@@ -421,7 +404,7 @@ function apparentTemperatureSun(tempC, humidity, radiationWm2, radiationTimestam
 // mostrare un dato senza indicazione di cosa sia.
 function parseLastRowLabeled(html, labels, showUnknown = true) {
 
-  const tableRows = parseHtmlTableRows(html);
+  const tableRows = parseStationTableRows(html);
 
   if (tableRows.length === 0) {
     return null;
@@ -497,12 +480,69 @@ function parseHtmlTableRows(html) {
   return rows;
 }
 
-async function loadPalazzoCavalli() {
+// r.jina.ai trasforma la tabella HTML in Markdown. Viene usato solo
+// come riserva quando il Worker personale riceve dal Comune una pagina
+// di protezione al posto dei dati. Accettiamo esclusivamente righe la
+// cui prima cella e' un timestamp, cosi' intestazioni e testo estraneo
+// non possono essere scambiati per misure.
+function parseMarkdownTableRows(text) {
+  return text
+    .split(/\r?\n/)
+    .filter(line => /^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*\|/.test(line))
+    .map(line => line
+      .split("|")
+      .slice(1, -1)
+      .map(cell => cell.trim())
+    );
+}
 
-  const response = await fetch(PALAZZO_CAVALLI_URL);
-  const html = await response.text();
+function parseStationTableRows(text) {
+  const htmlRows = parseHtmlTableRows(text);
+  return htmlRows.length ? htmlRows : parseMarkdownTableRows(text);
+}
 
-  const parsedRows = parseHtmlTableRows(html).map(cols => ({
+const CPSM_TABLE_CACHE_MS = 5 * 60 * 1000;
+const cpsmTableCache = new Map();
+
+async function fetchCpsmTableRows(sourceUrl) {
+  const cached = cpsmTableCache.get(sourceUrl);
+  if (cached && Date.now() - cached.savedAt < CPSM_TABLE_CACHE_MS) {
+    return cached.rows;
+  }
+
+  const legacyUrl = sourceUrl.replace("https:", "http:");
+  const candidates = [
+    proxyUrl(legacyUrl),
+    "https://r.jina.ai/" + legacyUrl
+  ];
+  let lastError = null;
+
+  for (let index = 0; index < candidates.length; index++) {
+    try {
+      const response = await fetchWithTimeout(candidates[index], index === 0 ? 6000 : 20000);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+
+      const text = await response.text();
+      const rows = parseStationTableRows(text);
+      if (rows.length) {
+        cpsmTableCache.set(sourceUrl, { savedAt: Date.now(), rows });
+        return rows;
+      }
+
+      throw new Error("Nessuna riga dati riconoscibile");
+    } catch (error) {
+      lastError = error;
+      console.warn("Tabella CPSM non disponibile da", candidates[index], error);
+    }
+  }
+
+  throw lastError || new Error("Tabella CPSM non disponibile");
+}
+
+async function loadPalazzoCavalliTable() {
+  const tableRows = await fetchCpsmTableRows(PALAZZO_CAVALLI_SOURCE_URL);
+
+  const rows = tableRows.map(cols => ({
     timestamp: cols[0],
     pressure: parseFloat(cols[1]),
     temperature: parseFloat(cols[2]),
@@ -510,6 +550,17 @@ async function loadPalazzoCavalli() {
     radiation: parseFloat(cols[4]),
     rain: parseFloat(cols[5])
   }));
+
+  if (rows.length === 0) {
+    throw new Error("Nessuna riga dati trovata per Palazzo Cavalli");
+  }
+
+  return rows;
+}
+
+async function loadPalazzoCavalli() {
+
+  const parsedRows = await loadPalazzoCavalliTable();
 
   const last = parsedRows[parsedRows.length - 1];
 
@@ -539,11 +590,7 @@ async function loadPalazzoCavalli() {
 }
 
 async function loadSanGiorgio() {
-
-  const response = await fetch(SAN_GIORGIO_URL);
-  const html = await response.text();
-
-  const tableRows = parseHtmlTableRows(html);
+  const tableRows = await fetchCpsmTableRows(SAN_GIORGIO_SOURCE_URL);
   const cols = tableRows[tableRows.length - 1];
 
   return {
@@ -589,6 +636,17 @@ async function loadCannaregioPalestra() {
       available: true,
       temperature: numberOrNull(station.temp),
       humidity: numberOrNull(station.humidity),
+      dewPoint: numberOrNull(station.dewPoint),
+      heatIndex: numberOrNull(station.heatIndex),
+      pressure: numberOrNull(station.pressure),
+      windSpeed: numberOrNull(station.windSpeed),
+      windGust: numberOrNull(station.windGust),
+      windDir: numberOrNull(station.windDir),
+      rainRate: numberOrNull(station.rainLive ?? station.rainRate),
+      rain60min: numberOrNull(station.rain60min),
+      rain24h: numberOrNull(station.rain24h ?? station.rain),
+      solarRadiation: numberOrNull(station.solarRad),
+      uvIndex: numberOrNull(station.uvIndex),
       updatedAt: numberOrNull(station.updatedAt),
       stale: Boolean(station.stale)
     };
@@ -598,23 +656,13 @@ async function loadCannaregioPalestra() {
   }
 }
 
-// A differenza delle altre fonti (Cavalli/Punta Salute/Misericordia
-// passano dal Worker; Lido Meteo ha un fallback a 4 livelli), fino alla
-// v3.9 questa funzione chiamava ARPA Veneto direttamente dal telefono,
-// senza timeout e senza controllo di response.ok. Su reti mobili dove
-// quella chiamata diretta viene bloccata/rallentata (es. filtri
-// anti-abuso lato ARPA su certi range IP degli operatori, o traduzione
-// IPv6->IPv4 instabile sul 5G) l'errore andava a bloccare l'intero
-// Promise.all di loadAll(), facendo sparire anche Cavalli/Punta
-// Salute/Misericordia insieme a Cavanis. Ora si tenta prima via Worker
-// (la richiesta parte dall'IP del Worker, non dal telefono) e solo se
-// fallisce si ricade sulla chiamata diretta - bug reale riscontrato il
-// 19/09/2026 (funzionava su WiFi e su un secondo telefono/operatore,
-// falliva sempre sui dati mobili di un telefono in particolare).
+// Cavanis viene richiesto prima attraverso il Worker e poi, se serve,
+// direttamente ad ARPA Veneto. Il doppio percorso evita che filtri o
+// problemi di rete legati a uno specifico operatore mobile rendano la
+// stazione irraggiungibile anche quando la fonte e' disponibile.
 async function loadCavanis() {
 
   const sources = [proxyUrl(CAVANIS_API_URL), CAVANIS_API_URL];
-
   let json = null;
 
   for (const url of sources) {
@@ -628,7 +676,7 @@ async function loadCavanis() {
     }
   }
 
-  if (!json) {
+  if (!json || !Array.isArray(json.data)) {
     throw new Error("Cavanis: nessuna fonte disponibile");
   }
 
@@ -645,6 +693,10 @@ async function loadCavanis() {
   const lastWindSpeed = lastOfType("VVENTO10M");
   const lastWindDir = lastOfType("DVENTO10M");
   const lastRain = lastOfType("PREC");
+
+  if (!lastTemp || !lastHumidity) {
+    throw new Error("Cavanis: temperatura o umidita non disponibili");
+  }
 
   // RADSOL e' in MJ/mq (energia cumulata nell'ultima ora), non in
   // W/mq (potenza istantanea) come serve alla formula della
@@ -824,11 +876,7 @@ async function loadLidoMeteo() {
 }
 
 async function loadPuntaSalute() {
-
-  const response = await fetch(PUNTA_SALUTE_URL);
-  const html = await response.text();
-
-  const tableRows = parseHtmlTableRows(html);
+  const tableRows = await fetchCpsmTableRows(PUNTA_SALUTE_SOURCE_URL);
   const cols = tableRows[tableRows.length - 1];
   const prevCols = tableRows[tableRows.length - 3];
 
@@ -851,22 +899,20 @@ async function loadPuntaSalute() {
 // Scarica e fa il parsing COMPLETO della tabella di Misericordia
 // (tutte le righe disponibili, non solo l'ultima): serve sia per la
 // marea di backup sia, soprattutto, per il grafico del vento che
-// mostra l'andamento nel tempo e non solo l'ultimo valore. Le colonne
-// vento/onda sono INFERITE (vedi commento su MISERICORDIA_LABELS): se
-// l'ordine reale fosse diverso, direzione/velocita'/raffica
-// risulterebbero scambiate tra loro.
+// mostra l'andamento nel tempo e non solo l'ultimo valore. L'ordine
+// delle colonne vento/onda segue l'intestazione della tabella ufficiale
+// giornaliera del Comune di Venezia.
 async function loadMisericordiaTable() {
+  const tableRows = await fetchCpsmTableRows(MISERICORDIA_SOURCE_URL);
 
-  const response = await fetch(MISERICORDIA_URL);
-  const html = await response.text();
-
-  const rows = parseHtmlTableRows(html).map(cols => ({
+  const rows = tableRows.map(cols => ({
     timestamp: cols[0],
     tide: parseFloat(cols[1]),
     windDir: parseFloat(cols[2]),
     windSpeed: parseFloat(cols[3]),
     windGust: parseFloat(cols[4]),
-    waveHeight: parseFloat(cols[5])
+    waveHeight: parseFloat(cols[5]),
+    waveMax: parseFloat(cols[6])
   }));
 
   if (rows.length === 0) {
@@ -958,10 +1004,21 @@ async function loadStationsConfig() {
 
     row.addEventListener("click", () => {
 
-      // Nota: la card principale in alto (temperatura) continua a
-      // linkare la pagina Meteonetwork tramite mainTempLink. Qui,
-      // nella lista delle stazioni, si mostra invece una scheda con
-      // i dati grezzi dell'API ARPA, come per le altre stazioni.
+      if (station.id === "punta_salute") {
+        openPuntaSaluteModal();
+        return;
+      }
+
+      if (station.id === "misericordia") {
+        openMisericordiaStationModal();
+        return;
+      }
+
+      if (station.id === "palazzo_cavalli") {
+        openPalazzoCavalliModal();
+        return;
+      }
+
       if (station.type === "meteonetwork") {
         openCavanisModal();
         return;
@@ -973,14 +1030,17 @@ async function loadStationsConfig() {
       }
 
       if (station.type === "wunderground") {
-        window.open(station.url, "_blank", "noopener");
+        openCannaregioPalestraModal();
         return;
       }
 
       if (station.url) {
         const labels = STATION_LABELS[station.id] || ["Data/Ora"];
         const verified = STATION_LABELS_VERIFIED[station.id] !== false;
-        openStationModal(station.name, proxyUrl(station.url), labels, verified);
+        openStationModal(station.name, proxyUrl(station.url), labels, verified, {
+          sourceUrl: station.url,
+          sourceLabel: station.sourceLabel || "Apri la pagina della fonte ↗"
+        });
       }
     });
 
@@ -990,20 +1050,137 @@ async function loadStationsConfig() {
 
 // --- Modale "scheda" stazione ---
 
-function showModal(title, bodyHtml) {
+function showModal(title, bodyHtml, options = {}) {
 
+  const modalCard = document.getElementById("modalCard");
+  const modalSubtitle = document.getElementById("modalSubtitle");
   document.getElementById("modalTitle").innerHTML = title;
   document.getElementById("modalBody").innerHTML = bodyHtml;
+  modalCard.dataset.theme = options.theme || "default";
+  modalSubtitle.textContent = options.subtitle || "";
+  modalSubtitle.hidden = !options.subtitle;
   document.getElementById("modalOverlay").classList.add("open");
+  document.getElementById("modalOverlay").setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
 }
 
 function hideModal() {
   document.getElementById("modalOverlay").classList.remove("open");
+  document.getElementById("modalOverlay").setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
 }
 
-async function openStationModal(title, url, labels, showUnknown = true) {
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-  showModal(title, "<p>Caricamento dati aggiornati...</p>");
+function renderStationMetric(icon, label, value, wide = false) {
+  if (value === null || value === undefined || value === "") return "";
+
+  return `
+<div class="station-detail-metric${wide ? " wide" : ""}">
+  <span class="station-detail-metric-icon" aria-hidden="true">${icon}</span>
+  <span class="station-detail-metric-copy">
+    <small>${escapeHtml(label)}</small>
+    <strong>${escapeHtml(value)}</strong>
+  </span>
+</div>`;
+}
+
+function renderStationReadings(metrics) {
+  const content = metrics.filter(Boolean).join("");
+  return content ? `<div class="station-detail-readings">${content}</div>` : "";
+}
+
+function detailComfortLabel(value) {
+  if (value == null || !Number.isFinite(value)) return "Dato n.d.";
+  if (value < 5) return "Freddo";
+  if (value < 13) return "Fresco";
+  if (value < 22) return "Confortevole";
+  if (value < 27) return "Caldo";
+  if (value < 32) return "Afoso";
+  return "Afa intensa";
+}
+
+function detailTemperatureColour(value) {
+  if (value == null || !Number.isFinite(value)) return "#9ca6af";
+  if (value < 13) return "#4f83c9";
+  if (value < 27) return "#5a9a69";
+  return "#c45d49";
+}
+
+function renderDetailTemperatureScale(temperature, humidity) {
+  if (temperature == null || !Number.isFinite(temperature)) return "";
+
+  const apparent = heatIndex(temperature, humidity);
+  const percent = Math.max(0, Math.min(100, ((apparent + 5) / 45) * 100));
+  const colour = detailTemperatureColour(apparent);
+
+  return `
+<div class="detail-temperature-scale">
+  <div class="detail-temperature-heading">
+    <span>Temperatura percepita</span>
+    <strong>${apparent.toFixed(1)} °C</strong>
+  </div>
+  <div class="detail-temperature-row">
+    <div class="detail-temperature-track">
+      <i class="detail-temperature-marker" style="left:${percent.toFixed(1)}%;border-color:${colour}"></i>
+    </div>
+    <span class="detail-temperature-label" style="color:${colour}">${detailComfortLabel(apparent)}</span>
+  </div>
+</div>`;
+}
+
+function renderTemperaturePrimary(temperature, humidity) {
+  const temperatureText = temperature != null && Number.isFinite(temperature)
+    ? temperature.toFixed(1) + " °C"
+    : "n.d.";
+  const humidityText = humidity != null && Number.isFinite(humidity)
+    ? "💧 " + humidity.toFixed(0) + " %"
+    : "💧 n.d.";
+
+  return `
+<div class="station-detail-primary">
+  <span class="station-detail-main-value">${temperatureText}</span>
+  <span class="station-detail-secondary-value">${humidityText}</span>
+</div>
+${renderDetailTemperatureScale(temperature, humidity)}`;
+}
+
+function renderPrimaryValues(mainValue, secondaryValue) {
+  return `
+<div class="station-detail-primary">
+  <span class="station-detail-main-value">${escapeHtml(mainValue)}</span>
+  ${secondaryValue
+    ? `<span class="station-detail-secondary-value">${escapeHtml(secondaryValue)}</span>`
+    : ""}
+</div>`;
+}
+
+function renderUpdatedDetail(value) {
+  return value
+    ? `<div class="station-detail-updated">🕐 Ultimo dato: ${escapeHtml(value)}</div>`
+    : "";
+}
+
+function renderSourceLink(url, label) {
+  if (!url) return "";
+  return `<a class="modal-source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(label || "Apri la pagina della fonte ↗")}</a>`;
+}
+
+async function openStationModal(title, url, labels, showUnknown = true, options = {}) {
+
+  const modalOptions = {
+    theme: options.theme || "neutral",
+    subtitle: options.subtitle || "Dati della stazione"
+  };
+
+  showModal(title, "<p>Caricamento dati aggiornati...</p>", modalOptions);
 
   try {
 
@@ -1022,109 +1199,267 @@ async function openStationModal(title, url, labels, showUnknown = true) {
       )
       .join("");
 
-    showModal(title, html);
+    showModal(
+      title,
+      html + renderSourceLink(options.sourceUrl, options.sourceLabel),
+      modalOptions
+    );
 
   } catch (err) {
 
     console.error(err);
-    showModal(title, "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>");
+    showModal(
+      title,
+      "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>" +
+        renderSourceLink(options.sourceUrl, options.sourceLabel),
+      modalOptions
+    );
   }
 }
 
-// Scheda dati ARPA per Osservatorio Cavanis, usata dalla lista
-// "Stazioni utilizzate" in fondo alla pagina. La card principale in
-// alto (temperatura) continua invece a linkare la pagina Meteonetwork
-// tramite mainTempLink/CAVANIS_URL: qui si tratta di una scheda
-// separata, coerente nello stile con le altre stazioni della lista
-// (Palazzo Cavalli, San Giorgio, Punta della Salute), ma con dati
-// presi dall'API ARPA invece che dalle pagine del Comune.
+async function openPalazzoCavalliModal() {
+  const options = {
+    theme: "temperature",
+    subtitle: "Comune di Venezia · stazione urbana"
+  };
+  showModal("Palazzo Cavalli", "<p>Caricamento dati aggiornati...</p>", options);
+
+  try {
+    const data = await loadPalazzoCavalli();
+    const readings = renderStationReadings([
+      renderStationMetric("⏲️", "Pressione", Number.isFinite(data.pressure) ? data.pressure.toFixed(1) + " hPa" : null),
+      renderStationMetric("☀️", "Radiazione solare", Number.isFinite(data.radiation) ? Math.round(data.radiation) + " W/mq" : null),
+      renderStationMetric("🌧️", "Ultimi 5 minuti", Number.isFinite(data.rain) ? data.rain.toFixed(1) + " mm" : null),
+      renderStationMetric("☔", "Ultima ora", Number.isFinite(data.rainLastHour) ? data.rainLastHour.toFixed(1) + " mm" : null),
+      renderStationMetric("🌦️", "Ultime 24 ore", Number.isFinite(data.rain24h) ? data.rain24h.toFixed(1) + " mm" : null)
+    ]);
+
+    showModal(
+      "Palazzo Cavalli",
+      renderTemperaturePrimary(data.temperature, data.humidity) +
+        readings +
+        renderUpdatedDetail(formatDateTime(data.timestamp)) +
+        renderSourceLink(PALAZZO_CAVALLI_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  } catch (err) {
+    console.error(err);
+    showModal(
+      "Palazzo Cavalli",
+      "<p>Dati temporaneamente non disponibili.</p>" +
+        renderSourceLink(PALAZZO_CAVALLI_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  }
+}
+
+async function openPuntaSaluteModal() {
+  const options = {
+    theme: "sea",
+    subtitle: "Comune di Venezia · stazione mareografica"
+  };
+  showModal("Punta della Dogana (Punta Salute)", "<p>Caricamento dati aggiornati...</p>", options);
+
+  try {
+    const data = await loadPuntaSalute();
+    const trendLabel = data.trend === "↑"
+      ? "Marea in aumento"
+      : data.trend === "↓"
+        ? "Marea in diminuzione"
+        : "Marea stabile";
+
+    showModal(
+      "Punta della Dogana (Punta Salute)",
+      renderPrimaryValues(
+        Number.isFinite(data.tide) ? data.tide + " cm " + data.trend : "n.d.",
+        Number.isFinite(data.waterTemp) ? "🌡️ acqua " + data.waterTemp.toFixed(1) + " °C" : null
+      ) +
+        renderStationReadings([
+          renderStationMetric("🌊", "Tendenza", trendLabel),
+          renderStationMetric("🌡️", "Temperatura acqua", Number.isFinite(data.waterTemp) ? data.waterTemp.toFixed(1) + " °C" : null)
+        ]) +
+        renderUpdatedDetail(formatDateTime(data.timestamp)) +
+        renderSourceLink(PUNTA_SALUTE_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  } catch (err) {
+    console.error(err);
+    showModal(
+      "Punta della Dogana (Punta Salute)",
+      "<p>Dati temporaneamente non disponibili.</p>" +
+        renderSourceLink(PUNTA_SALUTE_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  }
+}
+
+async function openMisericordiaStationModal() {
+  const options = {
+    theme: "wind",
+    subtitle: "Comune di Venezia · marea, vento e moto ondoso"
+  };
+  showModal("Misericordia", "<p>Caricamento dati aggiornati...</p>", options);
+
+  try {
+    const rows = await loadMisericordiaTable();
+    const last = rows[rows.length - 1];
+    const windKmh = Number.isFinite(last.windSpeed) ? last.windSpeed * 3.6 : null;
+    const gustKmh = Number.isFinite(last.windGust) ? last.windGust * 3.6 : null;
+
+    showModal(
+      "Misericordia",
+      renderPrimaryValues(
+        Number.isFinite(last.tide) ? Math.round(last.tide * 100) + " cm" : "n.d.",
+        windKmh != null ? "💨 " + Math.round(windKmh) + " km/h" : null
+      ) +
+        renderStationReadings([
+          renderStationMetric("🧭", "Direzione vento", Number.isFinite(last.windDir) ? windDirection(last.windDir) + " (" + Math.round(last.windDir) + "°)" : null),
+          renderStationMetric("🌬️", "Raffica", gustKmh != null ? Math.round(gustKmh) + " km/h" : null),
+          renderStationMetric("🌊", "Onda significativa", Number.isFinite(last.waveHeight) ? last.waveHeight.toFixed(2) + " m" : null),
+          renderStationMetric("〰️", "Onda massima", Number.isFinite(last.waveMax) ? last.waveMax.toFixed(2) + " m" : null)
+        ]) +
+        renderUpdatedDetail(formatDateTime(last.timestamp)) +
+        renderSourceLink(MISERICORDIA_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  } catch (err) {
+    console.error(err);
+    showModal(
+      "Misericordia",
+      "<p>Dati temporaneamente non disponibili.</p>" +
+        renderSourceLink(MISERICORDIA_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  }
+}
+
+// Scheda ARPA con lo stesso linguaggio visivo dei dettagli delle
+// stazioni amatoriali. Il collegamento esterno resta disponibile, ma
+// soltanto in fondo alla scheda: il tocco sul dato non porta più via
+// direttamente da LagunaLive.
 async function openCavanisModal() {
-
-  showModal("Osservatorio Cavanis", "<p>Caricamento dati aggiornati...</p>");
+  const options = {
+    theme: "temperature",
+    subtitle: "ARPAV · Osservatorio Cavanis"
+  };
+  showModal("Osservatorio Cavanis", "<p>Caricamento dati aggiornati...</p>", options);
 
   try {
+    const data = await loadCavanis();
+    const windText = Number.isFinite(data.windSpeed)
+      ? Math.round(data.windSpeed * 3.6) + " km/h" +
+        (Number.isFinite(data.windDir) ? " · " + windDirection(data.windDir) : "")
+      : null;
 
-    const cavanis = await loadCavanis();
-
-    const rows = [
-      { label: "Temperatura", value: cavanis.temperature != null ? cavanis.temperature.toFixed(1) + " °C" : "n.d." },
-      { label: "Umidità", value: cavanis.humidity != null ? cavanis.humidity.toFixed(0) + " %" : "n.d." },
-      {
-        label: "Vento",
-        value:
-          (cavanis.windDir != null && !isNaN(cavanis.windDir) ? windDirection(cavanis.windDir) + " " : "") +
-          (cavanis.windSpeed != null && !isNaN(cavanis.windSpeed) ? Math.round(cavanis.windSpeed * 3.6) + " km/h" : "n.d.")
-      },
-      { label: "Radiazione solare", value: cavanis.radiation != null ? Math.round(cavanis.radiation) + " W/mq" : "n.d." },
-      { label: "Pioggia", value: cavanis.rain != null ? cavanis.rain.toFixed(1) + " mm" : "n.d." },
-      { label: "Aggiornato", value: formatTime(cavanis.timestamp) }
-    ];
-
-    const html = rows
-      .map(r =>
-        `<div class="modal-row"><span class="modal-label">${r.label}</span><span class="modal-value">${r.value}</span></div>`
-      )
-      .join("");
-
-    showModal("Osservatorio Cavanis", html);
-
+    showModal(
+      "Osservatorio Cavanis",
+      renderTemperaturePrimary(data.temperature, data.humidity) +
+        renderStationReadings([
+          renderStationMetric("💨", "Vento", windText),
+          renderStationMetric("☀️", "Radiazione solare", Number.isFinite(data.radiation) ? Math.round(data.radiation) + " W/mq" : null),
+          renderStationMetric("🌧️", "Pioggia", Number.isFinite(data.rain) ? data.rain.toFixed(1) + " mm" : null)
+        ]) +
+        renderUpdatedDetail(formatDateTime(data.timestamp)) +
+        renderSourceLink(CAVANIS_URL, "Apri la pagina della stazione ↗"),
+      options
+    );
   } catch (err) {
-
     console.error(err);
-    showModal("Osservatorio Cavanis", "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, l'API ARPA potrebbe essere temporaneamente offline.</p>");
+    showModal(
+      "Osservatorio Cavanis",
+      "<p>Dati temporaneamente non disponibili.</p>" +
+        renderSourceLink(CAVANIS_URL, "Apri la pagina della stazione ↗"),
+      options
+    );
   }
 }
 
-// Scheda "Lido Meteo" (RMLV/ISPRA), stesso stile delle altre schede
-// stazione. Rifa' il fetch al click (dato fresco, coerente con
-// openCavanisModal) invece di riusare il valore gia' caricato in
-// pagina.
-async function openLidoMeteoModal() {
-
-  showModal("Lido", "<p>Caricamento dati aggiornati...</p>");
+async function openCannaregioPalestraModal() {
+  const options = {
+    theme: "temperature",
+    subtitle: "Weather Underground · S. Alvise"
+  };
+  showModal("S. Alvise", "<p>Caricamento dati aggiornati...</p>", options);
 
   try {
+    const data = await loadCannaregioPalestra();
+    const windText = Number.isFinite(data.windSpeed)
+      ? data.windSpeed.toFixed(1) + " km/h" +
+        (Number.isFinite(data.windDir) ? " · " + windDirection(data.windDir) : "")
+      : null;
+    const staleWarning = data.stale
+      ? '<p class="stale-warning">⚠️ Il dato non risulta recente.</p>'
+      : "";
 
-    const data = await loadLidoMeteo();
-
-    if (!data.available) {
-      throw new Error("Dati non disponibili");
-    }
-
-    const rows = [
-      { label: "Temperatura", value: data.temperature != null ? data.temperature.toFixed(1) + " °C" : "n.d." },
-      { label: "Umidità", value: data.humidity != null ? data.humidity.toFixed(0) + " %" : "n.d." },
-      {
-        label: "Vento",
-        value:
-          (data.windDir != null && !isNaN(data.windDir) ? windDirection(data.windDir) + " " : "") +
-          (data.windSpeed != null && !isNaN(data.windSpeed) ? Math.round(data.windSpeed * 3.6) + " km/h" : "n.d.")
-      },
-      { label: "Pressione", value: data.pressure != null ? data.pressure.toFixed(1) + " hPa" : "n.d." },
-      { label: "Pioggia", value: data.rain != null ? data.rain.toFixed(1) + " mm" : "n.d." },
-      {
-        label: "Aggiornato",
-        value: data.timestamp
-          ? formatTimeIsprambiente(data.timestamp) + (data.stale ? " ⚠️" : "")
-          : "n.d."
-      }
-    ];
-
-    const html = rows
-      .map(r =>
-        `<div class="modal-row"><span class="modal-label">${r.label}</span><span class="modal-value">${r.value}</span></div>`
-      )
-      .join("") +
-      (data.stale
-        ? '<p class="stale-warning" style="margin-top:10px;">⚠️ La stazione risulta ferma da più di 2 ore: la rete ISPRA/RMLV può restare offline per giorni senza preavviso.</p>'
-        : "");
-
-    showModal("Lido", html);
-
+    showModal(
+      "S. Alvise",
+      staleWarning +
+        renderTemperaturePrimary(data.temperature, data.humidity) +
+        renderStationReadings([
+          renderStationMetric("🌡️", "Punto di rugiada", Number.isFinite(data.dewPoint) ? data.dewPoint.toFixed(1) + " °C" : null),
+          renderStationMetric("⏲️", "Pressione", Number.isFinite(data.pressure) ? data.pressure.toFixed(1) + " hPa" : null),
+          renderStationMetric("💨", "Vento", windText),
+          renderStationMetric("🌬️", "Raffica", Number.isFinite(data.windGust) ? data.windGust.toFixed(1) + " km/h" : null),
+          renderStationMetric("🌧️", "Intensità pioggia", Number.isFinite(data.rainRate) ? data.rainRate.toFixed(1) + " mm/h" : null),
+          renderStationMetric("🌦️", "Pioggia 24 ore", Number.isFinite(data.rain24h) ? data.rain24h.toFixed(1) + " mm" : null),
+          renderStationMetric("☀️", "Radiazione solare", Number.isFinite(data.solarRadiation) ? Math.round(data.solarRadiation) + " W/mq" : null),
+          renderStationMetric("🔆", "Indice UV", Number.isFinite(data.uvIndex) ? data.uvIndex.toFixed(1) : null)
+        ]) +
+        renderUpdatedDetail(data.updatedAt ? new Date(data.updatedAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" }) : null) +
+        renderSourceLink(PALESTRA_SOURCE_URL, "Apri la pagina della stazione ↗"),
+      options
+    );
   } catch (err) {
-
     console.error(err);
-    showModal("Lido", "<p>Errore nel caricamento dei dati, oppure la rete ISPRA/RMLV è al momento offline (è già successo per giorni consecutivi in passato).</p>");
+    showModal(
+      "S. Alvise",
+      "<p>Dati temporaneamente non disponibili.</p>" +
+        renderSourceLink(PALESTRA_SOURCE_URL, "Apri la pagina della stazione ↗"),
+      options
+    );
+  }
+}
+
+async function openLidoMeteoModal() {
+  const options = {
+    theme: "sea",
+    subtitle: "ISPRA · Rete Mareografica della Laguna di Venezia"
+  };
+  showModal("Lido Meteo", "<p>Caricamento dati aggiornati...</p>", options);
+
+  try {
+    const data = await loadLidoMeteo();
+    if (!data.available) throw new Error("Dati non disponibili");
+
+    const windText = Number.isFinite(data.windSpeed)
+      ? Math.round(data.windSpeed * 3.6) + " km/h" +
+        (Number.isFinite(data.windDir) ? " · " + windDirection(data.windDir) : "")
+      : null;
+    const staleWarning = data.stale
+      ? '<p class="stale-warning">⚠️ La stazione risulta ferma da più di 2 ore.</p>'
+      : "";
+
+    showModal(
+      "Lido Meteo",
+      staleWarning +
+        renderTemperaturePrimary(data.temperature, data.humidity) +
+        renderStationReadings([
+          renderStationMetric("💨", "Vento", windText),
+          renderStationMetric("⏲️", "Pressione", Number.isFinite(data.pressure) ? data.pressure.toFixed(1) + " hPa" : null),
+          renderStationMetric("🌧️", "Pioggia", Number.isFinite(data.rain) ? data.rain.toFixed(1) + " mm" : null)
+        ]) +
+        renderUpdatedDetail(data.timestamp ? formatTimeIsprambiente(data.timestamp) : null) +
+        renderSourceLink(LIDO_METEO_SOURCE_URL, "Apri la scheda ufficiale ISPRA ↗"),
+      options
+    );
+  } catch (err) {
+    console.error(err);
+    showModal(
+      "Lido Meteo",
+      "<p>Dati temporaneamente non disponibili; la rete ISPRA/RMLV può restare offline per alcuni giorni.</p>" +
+        renderSourceLink(LIDO_METEO_SOURCE_URL, "Apri la scheda ufficiale ISPRA ↗"),
+      options
+    );
   }
 }
 
@@ -1256,6 +1591,110 @@ function drawWindChart(canvas, rows) {
   }
 }
 
+function summarizeRainRows(rows) {
+  const last = rows[rows.length - 1];
+  const latestTime = new Date(last.timestamp.replace(" ", "T") + "+01:00");
+
+  const rainLastHour = rows
+    .filter(row => {
+      const time = new Date(row.timestamp.replace(" ", "T") + "+01:00");
+      const diffMinutes = (latestTime - time) / 60000;
+      return diffMinutes >= 0 && diffMinutes < 60;
+    })
+    .reduce((sum, row) => sum + (Number.isFinite(row.rain) ? Math.max(0, row.rain) : 0), 0);
+
+  const rain24h = rows
+    .reduce((sum, row) => sum + (Number.isFinite(row.rain) ? Math.max(0, row.rain) : 0), 0);
+
+  return {
+    last,
+    rainLastHour,
+    rain24h
+  };
+}
+
+function groupRainByHour(rows) {
+  const groups = new Map();
+
+  rows.forEach(row => {
+    if (!row.timestamp) return;
+    const hourKey = row.timestamp.slice(0, 13);
+    const group = groups.get(hourKey) || {
+      timestamp: hourKey + ":00:00",
+      rain: 0
+    };
+    group.rain += Number.isFinite(row.rain) ? Math.max(0, row.rain) : 0;
+    groups.set(hourKey, group);
+  });
+
+  return Array.from(groups.values()).slice(-24);
+}
+
+// Grafico a barre degli accumuli orari. I dati originali di Palazzo
+// Cavalli sono intervalli da cinque minuti: sommarli per ora rende il
+// grafico leggibile sul telefono senza perdere il totale delle 24 ore.
+function drawRainChart(canvas, rows) {
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || 320;
+  const cssHeight = 220;
+
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.height = cssHeight + "px";
+
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const padding = { top: 16, right: 10, bottom: 36, left: 38 };
+  const plotWidth = cssWidth - padding.left - padding.right;
+  const plotHeight = cssHeight - padding.top - padding.bottom;
+  const values = rows.map(row => Number.isFinite(row.rain) ? row.rain : 0);
+  const maxValue = Math.max(1, ...values) * 1.15;
+  const gridLines = 4;
+
+  ctx.strokeStyle = "#e6edf3";
+  ctx.fillStyle = "#7a8794";
+  ctx.font = "11px Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
+  for (let index = 0; index <= gridLines; index++) {
+    const value = maxValue / gridLines * index;
+    const y = padding.top + plotHeight - value / maxValue * plotHeight;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + plotWidth, y);
+    ctx.stroke();
+    ctx.fillText(value < 1 ? value.toFixed(1) : value.toFixed(0), padding.left - 6, y);
+  }
+
+  const slotWidth = plotWidth / Math.max(1, rows.length);
+  const barWidth = Math.max(3, slotWidth * 0.68);
+  const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + plotHeight);
+  gradient.addColorStop(0, "#75b8dc");
+  gradient.addColorStop(1, "#3979a7");
+  ctx.fillStyle = gradient;
+
+  rows.forEach((row, index) => {
+    const height = row.rain / maxValue * plotHeight;
+    const x = padding.left + index * slotWidth + (slotWidth - barWidth) / 2;
+    const y = padding.top + plotHeight - height;
+    ctx.fillRect(x, y, barWidth, Math.max(row.rain > 0 ? 2 : 0, height));
+  });
+
+  ctx.fillStyle = "#7a8794";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  const tickCount = Math.min(5, rows.length);
+  for (let tick = 0; tick < tickCount; tick++) {
+    const index = Math.round(tick / Math.max(1, tickCount - 1) * (rows.length - 1));
+    const x = padding.left + (index + 0.5) * slotWidth;
+    ctx.fillText(formatTime(rows[index].timestamp), x, padding.top + plotHeight + 7);
+  }
+}
+
 // Formato orario per i timestamp di Misericordia (stesso formato
 // "YYYY-MM-DD HH:MM:SS" delle altre tabelle CPSM: riusa formatTime).
 function formatMisericordiaTime(timestamp) {
@@ -1263,8 +1702,12 @@ function formatMisericordiaTime(timestamp) {
 }
 
 async function openWindChartModal() {
+  const options = {
+    theme: "wind",
+    subtitle: "Misericordia · Comune di Venezia"
+  };
 
-  showModal("Vento &middot; Misericordia", "<p>Caricamento dati aggiornati...</p>");
+  showModal("Vento", "<p>Caricamento dati aggiornati...</p>", options);
 
   try {
 
@@ -1275,27 +1718,39 @@ async function openWindChartModal() {
     }
 
     const last = rows[rows.length - 1];
+    const speed = Number.isFinite(last.windSpeed) ? last.windSpeed * 3.6 : null;
+    const gust = Number.isFinite(last.windGust) ? last.windGust * 3.6 : null;
 
-    const summaryHtml = `
-<div class="modal-row"><span class="modal-label">Direzione</span><span class="modal-value">${!isNaN(last.windDir) ? windDirection(last.windDir) + " (" + Math.round(last.windDir) + "°)" : "n.d."}</span></div>
-<div class="modal-row"><span class="modal-label">Velocità</span><span class="modal-value">${!isNaN(last.windSpeed) ? Math.round(last.windSpeed * 3.6) + " km/h" : "n.d."}</span></div>
-<div class="modal-row"><span class="modal-label">Raffica</span><span class="modal-value">${!isNaN(last.windGust) ? Math.round(last.windGust * 3.6) + " km/h" : "n.d."}</span></div>
-<div class="modal-row"><span class="modal-label">Aggiornato</span><span class="modal-value">${formatTime(last.timestamp)}</span></div>
-`;
+    const summaryHtml =
+      renderPrimaryValues(
+        speed != null ? Math.round(speed) + " km/h" : "n.d.",
+        gust != null ? "raffica " + Math.round(gust) + " km/h" : null
+      ) +
+      renderStationReadings([
+        renderStationMetric("🧭", "Direzione", Number.isFinite(last.windDir) ? windDirection(last.windDir) + " (" + Math.round(last.windDir) + "°)" : null),
+        renderStationMetric("🌬️", "Raffica", gust != null ? Math.round(gust) + " km/h" : null)
+      ]);
 
     const chartHtml = `
 <div class="wind-chart-wrap">
-  <canvas id="windChartCanvas"></canvas>
+  <canvas id="windChartCanvas" role="img" aria-label="Andamento del vento medio, delle raffiche e della direzione a Misericordia"></canvas>
   <div class="wind-chart-legend">
     <span><span class="legend-dot legend-speed"></span> Velocità</span>
     <span><span class="legend-dot legend-gust"></span> Raffica</span>
     <span>➤ Direzione</span>
   </div>
-  <p class="wind-chart-caption">Ultime ${rows.length} rilevazioni (Misericordia). Ordine delle colonne vento non ancora verificato sul sito ufficiale: se direzione/velocità/raffica sembrano incoerenti con le condizioni reali, segnalalo.</p>
+  <p class="wind-chart-caption">Ultime ${rows.length} rilevazioni di Misericordia: vento medio, raffica e direzione.</p>
 </div>
 `;
 
-    showModal("Vento &middot; Misericordia", summaryHtml + chartHtml);
+    showModal(
+      "Vento",
+      summaryHtml +
+        chartHtml +
+        renderUpdatedDetail(formatDateTime(last.timestamp)) +
+        renderSourceLink(MISERICORDIA_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
 
     // Il canvas va disegnato DOPO che showModal ha inserito l'HTML nel
     // DOM (l'elemento non esiste prima di quel momento).
@@ -1307,36 +1762,98 @@ async function openWindChartModal() {
   } catch (err) {
 
     console.error(err);
-    showModal("Vento &middot; Misericordia", "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto: se il problema persiste, la stazione potrebbe essere temporaneamente offline sul sito del Comune.</p>");
+    showModal(
+      "Vento",
+      "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto.</p>" +
+        renderSourceLink(MISERICORDIA_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+  }
+}
+
+async function openRainChartModal() {
+  const options = {
+    theme: "rain",
+    subtitle: "Palazzo Cavalli · Comune di Venezia"
+  };
+
+  showModal("Pioggia", "<p>Caricamento dati aggiornati...</p>", options);
+
+  try {
+    const rows = await loadPalazzoCavalliTable();
+    const summary = summarizeRainRows(rows);
+    const hourlyRows = groupRainByHour(rows);
+    const lastRain = Number.isFinite(summary.last.rain) ? Math.max(0, summary.last.rain) : null;
+
+    const summaryHtml =
+      renderPrimaryValues(
+        summary.rainLastHour.toFixed(1) + " mm",
+        "nell’ultima ora"
+      ) +
+      renderStationReadings([
+        renderStationMetric("🌧️", "Ultimo intervallo (5 min)", lastRain != null ? lastRain.toFixed(1) + " mm" : null),
+        renderStationMetric("☔", "Ultima ora", summary.rainLastHour.toFixed(1) + " mm"),
+        renderStationMetric("🌦️", "Ultime 24 ore", summary.rain24h.toFixed(1) + " mm")
+      ]);
+
+    const chartHtml = `
+<div class="rain-chart-wrap">
+  <canvas id="rainChartCanvas" role="img" aria-label="Accumulo orario della pioggia a Palazzo Cavalli nelle ultime 24 ore"></canvas>
+  <div class="rain-chart-legend">
+    <span><span class="legend-dot legend-rain"></span> Accumulo orario (mm)</span>
+  </div>
+  <p class="rain-chart-caption">Accumuli orari calcolati sommando le rilevazioni ogni 5 minuti di Palazzo Cavalli.</p>
+</div>`;
+
+    showModal(
+      "Pioggia",
+      summaryHtml +
+        chartHtml +
+        renderUpdatedDetail(formatDateTime(summary.last.timestamp)) +
+        renderSourceLink(PALAZZO_CAVALLI_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
+
+    const canvas = document.getElementById("rainChartCanvas");
+    if (canvas) drawRainChart(canvas, hourlyRows);
+
+  } catch (err) {
+    console.error(err);
+    showModal(
+      "Pioggia",
+      "<p>Errore nel caricamento dei dati. Riprova tra qualche minuto.</p>" +
+        renderSourceLink(PALAZZO_CAVALLI_SOURCE_URL, "Apri la tabella giornaliera del Comune ↗"),
+      options
+    );
   }
 }
 
 function setupInteractions() {
 
-  document.getElementById("mainTempLink").addEventListener("click", () => {
-    window.open(CAVANIS_URL, "_blank");
-  });
+  document.getElementById("mainTempLink").addEventListener("click", openCavanisModal);
 
-  document.getElementById("subCavalli").addEventListener("click", () => {
-    openStationModal("Palazzo Cavalli", PALAZZO_CAVALLI_URL, PALAZZO_CAVALLI_LABELS);
-  });
+  document.getElementById("subCavalli").addEventListener("click", openPalazzoCavalliModal);
 
-  document.getElementById("subPalestra").addEventListener("click", () => {
-    window.open(PALESTRA_SOURCE_URL, "_blank", "noopener");
-  });
+  document.getElementById("subPalestra").addEventListener("click", openCannaregioPalestraModal);
 
-  document.getElementById("mareLink").addEventListener("click", () => {
-    openStationModal("Punta della Dogana (Punta Salute)", PUNTA_SALUTE_URL, PUNTA_SALUTE_LABELS);
-  });
+  document.getElementById("mareLink").addEventListener("click", openPuntaSaluteModal);
 
   document.getElementById("subLidoMeteo").addEventListener("click", openLidoMeteoModal);
 
   document.getElementById("windLine").addEventListener("click", openWindChartModal);
 
+  document.getElementById("rainLine").addEventListener("click", openRainChartModal);
+
   document.getElementById("modalClose").addEventListener("click", hideModal);
 
   document.getElementById("modalOverlay").addEventListener("click", (e) => {
     if (e.target.id === "modalOverlay") hideModal();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.getElementById("modalOverlay").classList.contains("open")) {
+      hideModal();
+    }
   });
 }
 
@@ -1431,29 +1948,46 @@ async function loadAll() {
 
     const [cavalli, cavanis, puntaSalute, misericordiaWind] = await Promise.all([
       loadPalazzoCavalli(),
-      loadCavanis(),
+      loadCavanis().catch(err => {
+        // Cavanis non deve mai impedire il caricamento delle altre card.
+        // Se sia il Worker sia ARPA falliscono, temperatura e umidita'
+        // usano temporaneamente Palazzo Cavalli come fonte principale.
+        console.warn("Cavanis non disponibile, uso Palazzo Cavalli:", err);
+        return null;
+      }),
       loadTide(),
       loadMisericordiaWind()
     ]);
 
+    const thermalSource = cavanis || {
+      timestamp: cavalli.timestamp,
+      temperature: cavalli.temperature,
+      humidity: cavalli.humidity,
+      radiation: cavalli.radiation,
+      radiationTimestamp: cavalli.timestamp
+    };
+
     // --- Card 1: temperatura, Cavanis come stazione principale ---
 
     document.getElementById("temp").innerHTML =
-      cavanis.temperature.toFixed(1) + " °C";
+      thermalSource.temperature.toFixed(1) + " °C";
 
     document.getElementById("tempStation").innerHTML =
-      "Osservatorio Cavanis &middot; 🕐 " + formatTime(cavanis.timestamp);
+      (cavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
+      " &middot; 🕐 " + formatTime(thermalSource.timestamp);
 
     document.getElementById("subCavalli").innerHTML =
-      "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
-      " °C (" + formatTime(cavalli.timestamp) + ")";
+      cavanis
+        ? "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
+          " °C (" + formatTime(cavalli.timestamp) + ")"
+        : "Osservatorio Cavanis: n.d.";
 
     // --- Card 2: umidita' e temperatura percepita (da Cavanis) ---
 
     document.getElementById("humidity").innerHTML =
-      cavanis.humidity.toFixed(0) + " %";
+      thermalSource.humidity.toFixed(0) + " %";
 
-    const hi = heatIndex(cavanis.temperature, cavanis.humidity);
+    const hi = heatIndex(thermalSource.temperature, thermalSource.humidity);
 
     document.getElementById("heatIndex").innerHTML =
       hi.toFixed(1) + " °C";
@@ -1470,14 +2004,14 @@ async function loadAll() {
     try {
 
       const radiationFresh =
-        cavanis.radiationTimestamp != null &&
-        minutesBetween(cavanis.timestamp, cavanis.radiationTimestamp) <= STALE_MINUTES;
+        thermalSource.radiationTimestamp != null &&
+        minutesBetween(thermalSource.timestamp, thermalSource.radiationTimestamp) <= STALE_MINUTES;
 
       thsw = apparentTemperatureSun(
-        cavanis.temperature,
-        cavanis.humidity,
-        radiationFresh ? cavanis.radiation : null,
-        radiationFresh ? cavanis.radiationTimestamp : null
+        thermalSource.temperature,
+        thermalSource.humidity,
+        radiationFresh ? thermalSource.radiation : null,
+        radiationFresh ? thermalSource.radiationTimestamp : null
       );
 
       if (thsw == null || isNaN(thsw)) {
@@ -1492,10 +2026,13 @@ async function loadAll() {
       thsw.toFixed(1) + " °C";
 
     document.getElementById("humidityStation").innerHTML =
-      "Osservatorio Cavanis &middot; 🕐 " + formatTime(cavanis.timestamp);
+      (cavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
+      " &middot; 🕐 " + formatTime(thermalSource.timestamp);
 
     document.getElementById("humidityCavalli").innerHTML =
-      `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`;
+      cavanis
+        ? `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`
+        : "Osservatorio Cavanis: n.d.";
 
     // humidityLidoMeteo e humidityPalestra vengono aggiornati dai
     // rispettivi caricamenti indipendenti (vedi commenti sopra).
@@ -1516,9 +2053,8 @@ async function loadAll() {
     // --- Card 4: vento (Misericordia), pioggia, pressione ---
 
     // Vento preso da Misericordia invece che da Cavanis (ARPA): piu'
-    // vicina a casa dell'utente. La velocita' e' inferita in m/s per
-    // analogia con le altre stazioni della stessa rete CPSM (colonna
-    // non ancora verificata, vedi commento su MISERICORDIA_LABELS).
+    // vicina a casa dell'utente. La tabella ufficiale CPSM espone la
+    // velocita' in m/s; nella card viene convertita in km/h.
     document.getElementById("wind").innerHTML =
       misericordiaWind.available
         ? (misericordiaWind.windDir != null && !isNaN(misericordiaWind.windDir)
@@ -1553,6 +2089,7 @@ async function loadAll() {
     document.getElementById("status").innerHTML =
       "Aggiornato alle " +
       now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) +
+      (cavanis ? "" : " &middot; Cavanis non disponibile") +
       " &middot; " + APP_VERSION;
 
   } catch (error) {

@@ -5,7 +5,8 @@
       "name": "Punta della Salute",
       "type": "cpsm",
       "role": "tide_primary",
-      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html",
+      "url": "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Punta_Salute.html",
+      "sourceLabel": "Apri la tabella giornaliera del Comune ↗",
       "measures": ["tide", "water_temperature"]
     },
     {
@@ -13,16 +14,18 @@
       "name": "Misericordia",
       "type": "cpsm",
       "role": "tide_backup_wind_primary",
-      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html",
-      "measures": ["tide", "wind"]
+      "url": "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Misericordia.html",
+      "sourceLabel": "Apri la tabella giornaliera del Comune ↗",
+      "measures": ["tide", "wind", "waves"]
     },
     {
       "id": "palazzo_cavalli",
       "name": "Palazzo Cavalli",
       "type": "cpsm",
       "role": "urban",
-      "url": "http://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html",
-      "measures": ["temperature", "humidity", "pressure"]
+      "url": "https://www.comune.venezia.it/sites/default/files/publicCPSM2/stazioni/temporeale/Palazzo_Cavalli.html",
+      "sourceLabel": "Apri la tabella giornaliera del Comune ↗",
+      "measures": ["temperature", "humidity", "pressure", "rain", "solar_radiation"]
     },
     {
       "id": "cannaregio_palestra",
@@ -30,6 +33,7 @@
       "type": "wunderground",
       "role": "urban",
       "url": "https://www.wunderground.com/dashboard/pws/IVENIC160",
+      "sourceLabel": "Apri la pagina della stazione ↗",
       "measures": ["temperature", "humidity", "wind", "rain", "pressure"]
     },
     {
@@ -37,15 +41,17 @@
       "name": "Osservatorio Cavanis",
       "type": "meteonetwork",
       "role": "urban",
-      "url": "",
-      "measures": ["temperature", "humidity"]
+      "url": "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia",
+      "sourceLabel": "Apri la pagina della stazione ↗",
+      "measures": ["temperature", "humidity", "wind", "rain", "solar_radiation"]
     },
     {
       "id": "lido_meteo",
       "name": "Lido",
       "type": "isprambiente",
       "role": "urban",
-      "url": "",
+      "url": "https://www.venezia.isprambiente.it/index.php?folder_id=2115",
+      "sourceLabel": "Apri la scheda ufficiale ISPRA ↗",
       "measures": ["temperature", "humidity", "wind", "pressure", "rain"]
     }
   ]

@@ -38,8 +38,85 @@ h1 {
   background: white;
   padding: 14px 16px;
   margin: 10px 0;
+  border: 1px solid rgba(20, 60, 110, 0.08);
   border-radius: 14px;
   box-shadow: 0 2px 8px rgba(20, 60, 110, 0.08);
+}
+
+/* --- Colori delicati delle schede principali --- */
+
+.home-card {
+  --card-accent: #73808d;
+  --card-border: #dfe4e9;
+  --card-tint: #f7f8fa;
+  background: linear-gradient(180deg, var(--card-tint) 0%, #fff 118px);
+  border-color: var(--card-border);
+  border-top: 4px solid var(--card-accent);
+}
+
+.navigation-card {
+  --card-accent: #2a8178;
+  --card-border: #c8ded9;
+  --card-tint: #f0faf6;
+  background: linear-gradient(100deg, var(--card-tint) 0%, #fff 72%);
+  border-color: var(--card-border);
+  border-left: 5px solid var(--card-accent);
+}
+
+.card-temperature {
+  --card-accent: #bd673e;
+  --card-border: #f0d3c1;
+  --card-tint: #fff7ef;
+}
+
+.card-humidity {
+  --card-accent: #3f7fa8;
+  --card-border: #cadeec;
+  --card-tint: #eef7fd;
+}
+
+.card-sea {
+  --card-accent: #2d7f88;
+  --card-border: #c7e1e3;
+  --card-tint: #ecf8f8;
+}
+
+.card-weather {
+  --card-accent: #51796e;
+  --card-border: #d0dfd9;
+  --card-tint: #f1f7f4;
+}
+
+.card-forecast {
+  --card-accent: #7b6098;
+  --card-border: #ded2e8;
+  --card-tint: #f7f2fb;
+}
+
+.card-sources {
+  --card-accent: #7c8995;
+  --card-border: #dfe4e9;
+  --card-tint: #f7f8fa;
+}
+
+.card-temperature .main-temp-value {
+  color: #a95130;
+}
+
+.card-humidity .triple-value {
+  color: #316f99;
+}
+
+.card-sea .mare-value {
+  color: #226f79;
+}
+
+.card-weather .metric-data {
+  color: #3f6e62;
+}
+
+.card-forecast .prev-preview-temp {
+  color: #6f528e;
 }
 
 .card h2 {
@@ -243,8 +320,6 @@ h1 {
   gap: 11px;
   color: inherit;
   text-decoration: none;
-  border: 1px solid #c8d8eb;
-  border-left: 5px solid #2a8178;
 }
 
 .amateur-stations-link:hover,
@@ -359,14 +434,43 @@ h1 {
 }
 
 .modal {
-  background: white;
-  border-radius: 12px;
+  --modal-accent: #3f7fa8;
+  --modal-soft: #eef7fd;
+  background: linear-gradient(180deg, var(--modal-soft) 0, #fff 150px);
+  border-top: 5px solid var(--modal-accent);
+  border-radius: 14px;
   padding: 20px;
   max-width: 480px;
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
+  box-shadow: 0 18px 55px rgba(12, 34, 58, 0.28);
+}
+
+.modal[data-theme="temperature"] {
+  --modal-accent: #bd673e;
+  --modal-soft: #fff4eb;
+}
+
+.modal[data-theme="sea"] {
+  --modal-accent: #2d7f88;
+  --modal-soft: #eaf7f8;
+}
+
+.modal[data-theme="wind"] {
+  --modal-accent: #51796e;
+  --modal-soft: #edf6f2;
+}
+
+.modal[data-theme="rain"] {
+  --modal-accent: #3979a7;
+  --modal-soft: #edf6fc;
+}
+
+.modal[data-theme="neutral"] {
+  --modal-accent: #73808d;
+  --modal-soft: #f1f4f6;
 }
 
 .modal-close {
@@ -383,8 +487,162 @@ h1 {
 }
 
 .modal h2 {
-  margin: 0 0 12px 0;
+  margin: 0 0 2px 0;
   padding-right: 24px;
+  color: var(--modal-accent);
+}
+
+.modal-subtitle {
+  margin: 0 0 14px;
+  color: #66717e;
+  font-size: 0.76em;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.station-detail-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin: 15px 0 12px;
+}
+
+.station-detail-main-value {
+  color: #223044;
+  font-size: 2.45em;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.station-detail-secondary-value {
+  color: #66717e;
+  font-size: 1.25em;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.detail-temperature-scale {
+  margin-bottom: 16px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(102, 113, 126, 0.18);
+}
+
+.detail-temperature-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #66717e;
+  font-size: 0.72em;
+}
+
+.detail-temperature-heading strong {
+  color: #223044;
+  font-size: 0.84em;
+}
+
+.detail-temperature-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.detail-temperature-track {
+  position: relative;
+  flex: 1;
+  height: 7px;
+  min-width: 0;
+  background: linear-gradient(90deg, #4f83c9, #5aa66a 50%, #cf5a44);
+  border-radius: 999px;
+}
+
+.detail-temperature-marker {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-left: -7px;
+  background: #fff;
+  border: 3px solid #9ca6af;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(15, 35, 55, 0.28);
+}
+
+.detail-temperature-label {
+  min-width: 76px;
+  font-size: 0.7em;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.station-detail-readings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 13px;
+}
+
+.station-detail-metric {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.station-detail-metric.wide {
+  grid-column: 1 / -1;
+}
+
+.station-detail-metric-icon {
+  flex: 0 0 23px;
+  width: 23px;
+  font-size: 1em;
+  text-align: center;
+}
+
+.station-detail-metric-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.station-detail-metric-copy small {
+  color: #66717e;
+  font-size: 0.66em;
+}
+
+.station-detail-metric-copy strong {
+  overflow-wrap: anywhere;
+  color: #223044;
+  font-size: 0.84em;
+  font-weight: 750;
+}
+
+.station-detail-updated {
+  margin-top: 15px;
+  padding-top: 10px;
+  color: #66717e;
+  border-top: 1px solid #e3eaf0;
+  font-size: 0.72em;
+}
+
+.modal-source-link {
+  display: block;
+  margin-top: 13px;
+  padding: 9px 10px;
+  color: var(--modal-accent);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(102, 113, 126, 0.18);
+  border-radius: 10px;
+  font-size: 0.78em;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
 }
 
 .modal-row {
@@ -415,16 +673,19 @@ h1 {
 
 /* --- Grafico vento (modale Misericordia) --- */
 
-.wind-chart-wrap {
+.wind-chart-wrap,
+.rain-chart-wrap {
   margin-top: 14px;
 }
 
-#windChartCanvas {
+#windChartCanvas,
+#rainChartCanvas {
   width: 100%;
   display: block;
 }
 
-.wind-chart-legend {
+.wind-chart-legend,
+.rain-chart-legend {
   display: flex;
   gap: 14px;
   justify-content: center;
@@ -450,9 +711,35 @@ h1 {
   background: #a8c3f0;
 }
 
-.wind-chart-caption {
+.legend-rain {
+  background: #3979a7;
+}
+
+.wind-chart-caption,
+.rain-chart-caption {
   font-size: 0.75em;
   color: #888;
   margin-top: 8px;
   text-align: center;
+}
+
+@media (max-width: 410px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .modal {
+    max-height: 88vh;
+    padding: 18px;
+    border-radius: 16px 16px 12px 12px;
+  }
+
+  .station-detail-main-value {
+    font-size: 2.2em;
+  }
+
+  .station-detail-secondary-value {
+    font-size: 1.12em;
+  }
 }
