@@ -236,7 +236,9 @@ async function loadStations({ manual = false } = {}) {
       const fallbackStations = savedStations.length
         ? savedStations
         : currentStations;
-      const reason = result.reason?.message || "errore sconosciuto";
+      const reason = friendlyErrorReason(
+        result.reason?.message || "errore sconosciuto"
+      );
 
       if (fallbackStations.length) {
         loaded.push(...markSourceFallback(fallbackStations));
@@ -619,7 +621,7 @@ function renderModalFreshness(station) {
 
 function renderStationStatus(station) {
   if (station.error) {
-    return `<div class="station-alert error">${escapeHtml(station.error)}</div>`;
+    return `<div class="station-alert error">${escapeHtml(friendlyStationError(station.error))}</div>`;
   }
 
   if (station.sourceFallback) {
@@ -631,6 +633,38 @@ function renderStationStatus(station) {
   }
 
   return "";
+}
+
+function friendlyErrorReason(value) {
+  const message = String(value || "").trim();
+
+  if (/aborted|aborterror/i.test(message)) {
+    return "tempo di risposta scaduto";
+  }
+
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return "errore di collegamento";
+  }
+
+  return message || "errore sconosciuto";
+}
+
+function friendlyStationError(value) {
+  const reason = friendlyErrorReason(value);
+
+  if (reason === "tempo di risposta scaduto") {
+    return "La risposta non è arrivata: la stazione è temporaneamente non disponibile.";
+  }
+
+  if (reason === "errore di collegamento") {
+    return "Collegamento non riuscito: la stazione è temporaneamente non disponibile.";
+  }
+
+  if (/^HTTP \d{3}$/i.test(reason)) {
+    return `Dati temporaneamente non disponibili (${reason.toUpperCase()}).`;
+  }
+
+  return reason;
 }
 
 function openStationModal(stationKey, trigger) {

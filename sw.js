@@ -1,4 +1,4 @@
-const CACHE_NAME = "lagunalive-shell-v3.7";
+const CACHE_NAME = "lagunalive-shell-v3.8";
 
 // Solo la "cornice" dell'app (HTML/CSS/JS/icone) viene messa in cache:
 // i dati meteo restano sempre presi dalla rete in tempo reale, cosi'
@@ -42,7 +42,7 @@ const SHELL_FILES = [
   // Pagina delle stazioni amatoriali collegata dalla home.
   "./stazioni.html",
   "./stazioni.css?v=2.0",
-  "./stazioni.js?v=2.0"
+  "./stazioni.js?v=2.0.1"
 ];
 
 self.addEventListener("install", (event) => {
