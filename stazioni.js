@@ -9,6 +9,12 @@ const SOURCE_CACHE_PREFIX = "lagunalive-amateur-source-cache-v1-";
 const SOURCE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
+// La barra della temperatura percepita riprende il linguaggio visivo di
+// PozzaLive. Il range e' leggermente adattato al clima di Venezia: copre
+// senza schiacciare la scala sia le giornate fredde sia l'afa estiva.
+const COMFORT_MIN = -5;
+const COMFORT_MAX = 40;
+
 const SOURCES = [
   { id: "netatmo", label: "Netatmo", url: NETATMO_URL },
   { id: "weathercloud", label: "Weathercloud", url: WEATHERCLOUD_URL },
@@ -160,6 +166,7 @@ const overviewTime = document.getElementById("overviewTime");
 const refreshButton = document.getElementById("refreshButton");
 const sourceWarning = document.getElementById("sourceWarning");
 const stationModalOverlay = document.getElementById("stationModalOverlay");
+const stationModal = stationModalOverlay.querySelector(".station-modal");
 const stationModalTitle = document.getElementById("stationModalTitle");
 const stationModalSubtitle = document.getElementById("stationModalSubtitle");
 const stationModalBody = document.getElementById("stationModalBody");
@@ -282,6 +289,9 @@ function normalizeStation(station) {
     temp: numberOrNull(station.temp),
     humidity: numberOrNull(station.humidity),
     dewPoint: numberOrNull(station.dewPoint),
+    heatIndex: numberOrNull(station.heatIndex),
+    windChill: numberOrNull(station.windChill),
+    thw: numberOrNull(station.thw),
     pressure: numberOrNull(station.pressure),
     rainRate: numberOrNull(station.rainLive ?? station.rainRate),
     rain60min: numberOrNull(station.rain60min),
@@ -363,6 +373,10 @@ function renderGroup(group) {
   `;
 }
 
+function groupForStation(stationKey) {
+  return GROUPS.find((group) => group.keys.includes(stationKey)) || null;
+}
+
 function renderStationCard(station) {
   const role = ROLE_LABELS[station.networkRole] || "Stazione";
   const roleClass = ROLE_LABELS[station.networkRole]
@@ -416,32 +430,191 @@ function formatCompactHumidity(value) {
   return value === null ? "—" : `${formatNumber(value, 0)}%`;
 }
 
-function renderDetails(station) {
-  const rows = [
-    ["Temperatura", formatTemperature(station.temp)],
-    ["Umidità", formatUnit(station.humidity, "%", 0)],
-    ["Punto di rugiada", formatTemperature(station.dewPoint)],
-    ["Pressione", formatUnit(station.pressure, "hPa", 1)],
-    ["Intensità pioggia", formatUnit(station.rainRate, "mm/h", 2)],
-    ["Pioggia ultima ora", formatUnit(station.rain60min, "mm", 2)],
-    ["Vento", formatUnit(station.windKmh, "km/h", 1)],
-    ["Raffica", formatUnit(station.gustKmh, "km/h", 1)],
-    ["Direzione vento", formatWindDirection(station.windDir)],
-    ["Quota", formatUnit(station.altitude, "m", 0)],
-    ["Ultimo dato", formatDateTime(station.updatedAt)],
-    ["Coordinate", formatCoordinates(station.lat, station.lon)]
-  ].filter(([, value]) => value !== null);
+function apparentTemperature(station) {
+  if (station.thw !== null) return station.thw;
+  if (station.temp === null) return null;
 
-  if (!rows.length) {
-    return '<div class="detail-row"><span>Dati aggiuntivi</span><strong>n.d.</strong></div>';
+  // Quando la centralina fornisce un indice specifico, gli si da'
+  // precedenza nel campo in cui e' significativo.
+  if (station.temp >= 27 && station.heatIndex !== null) {
+    return station.heatIndex;
   }
 
-  return rows
-    .map(
-      ([label, value]) =>
-        `<div class="detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
-    )
-    .join("");
+  if (station.temp <= 10 && station.windChill !== null) {
+    return station.windChill;
+  }
+
+  // Apparent Temperature di Steadman, in ombra. Se manca il vento si usa
+  // l'indice calore semplificato gia' adottato nella home di LagunaLive.
+  if (station.humidity !== null && station.windKmh !== null) {
+    const vapourPressure =
+      (station.humidity / 100) *
+      6.105 *
+      Math.exp((17.27 * station.temp) / (237.7 + station.temp));
+
+    return station.temp + 0.33 * vapourPressure - 0.70 * (station.windKmh / 3.6) - 4;
+  }
+
+  if (station.humidity !== null) {
+    return humidityHeatIndex(station.temp, station.humidity);
+  }
+
+  return station.temp;
+}
+
+// Formula Rothfusz/NWS, uguale a quella della home di LagunaLive. Serve
+// soprattutto alle Netatmo senza anemometro: in estate la regressione
+// completa evita di sottostimare l'afa rispetto alla formula breve.
+function humidityHeatIndex(tempC, humidity) {
+  const fahrenheit = tempC * 9 / 5 + 32;
+
+  if (tempC < 27) {
+    const simpleFahrenheit =
+      0.5 *
+      (fahrenheit +
+        61 +
+        (fahrenheit - 68) * 1.2 +
+        humidity * 0.094);
+    const simpleCelsius = (simpleFahrenheit - 32) * 5 / 9;
+
+    return humidity < 40
+      ? Math.max(simpleCelsius, tempC)
+      : simpleCelsius;
+  }
+
+  const heatIndexFahrenheit =
+    -42.389 +
+    2.04901523 * fahrenheit +
+    10.14333127 * humidity -
+    0.22475541 * fahrenheit * humidity -
+    0.00683783 * fahrenheit * fahrenheit -
+    0.05481717 * humidity * humidity +
+    0.00122874 * fahrenheit * fahrenheit * humidity +
+    0.00085282 * fahrenheit * humidity * humidity -
+    0.00000199 * fahrenheit * fahrenheit * humidity * humidity;
+  const heatIndexCelsius = (heatIndexFahrenheit - 32) * 5 / 9;
+
+  return humidity < 40
+    ? Math.max(heatIndexCelsius, tempC)
+    : heatIndexCelsius;
+}
+
+function temperatureScalePercent(value) {
+  if (value === null || !Number.isFinite(value)) return null;
+  return Math.max(
+    0,
+    Math.min(100, ((value - COMFORT_MIN) / (COMFORT_MAX - COMFORT_MIN)) * 100)
+  );
+}
+
+function mixRgb(first, second, amount) {
+  return first.map((channel, index) =>
+    Math.round(channel + (second[index] - channel) * amount)
+  );
+}
+
+function temperatureColour(percent) {
+  if (percent === null) return "#9ca6af";
+
+  const cold = [79, 131, 201];
+  const comfortable = [90, 166, 106];
+  const hot = [207, 90, 68];
+  const colour = percent <= 50
+    ? mixRgb(cold, comfortable, percent / 50)
+    : mixRgb(comfortable, hot, (percent - 50) / 50);
+
+  return `rgb(${colour.join(",")})`;
+}
+
+function comfortLabel(value) {
+  if (value === null || !Number.isFinite(value)) return "Dato n.d.";
+  if (value < 5) return "Freddo";
+  if (value < 13) return "Fresco";
+  if (value < 22) return "Confortevole";
+  if (value < 27) return "Caldo";
+  if (value < 32) return "Afoso";
+  return "Afa intensa";
+}
+
+function renderTemperatureScale(station) {
+  const apparent = apparentTemperature(station);
+  const percent = temperatureScalePercent(apparent);
+  const colour = temperatureColour(percent);
+  const markerStyle = percent === null
+    ? "display:none"
+    : `left:${percent.toFixed(1)}%;border-color:${colour}`;
+
+  return `
+    <div class="temperature-scale">
+      <div class="temperature-scale-heading">
+        <span>Temperatura percepita</span>
+        <strong>${apparent === null ? "—" : `${formatNumber(apparent, 1)}°`}</strong>
+      </div>
+      <div class="temperature-scale-row">
+        <div class="temperature-scale-track">
+          <i class="temperature-scale-marker" style="${markerStyle}"></i>
+        </div>
+        <span class="temperature-scale-label" style="color:${colour}">${comfortLabel(apparent)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderMetric(icon, label, value, wide = false) {
+  if (value === null) return "";
+
+  return `
+    <div class="station-metric${wide ? " station-metric-wide" : ""}">
+      <span class="station-metric-icon" aria-hidden="true">${icon}</span>
+      <span class="station-metric-copy">
+        <small>${escapeHtml(label)}</small>
+        <strong>${escapeHtml(value)}</strong>
+      </span>
+    </div>
+  `;
+}
+
+function renderDetails(station) {
+  const direction = formatWindDirection(station.windDir);
+  const wind = formatUnit(station.windKmh, "km/h", 1);
+  const windWithDirection = wind === null
+    ? direction
+    : direction === null
+      ? wind
+      : `${wind} · ${direction}`;
+
+  const metrics = [
+    renderMetric("🌡️", "Punto di rugiada", formatTemperature(station.dewPoint)),
+    renderMetric("⏲️", "Pressione", formatUnit(station.pressure, "hPa", 1)),
+    renderMetric("💨", "Vento", windWithDirection),
+    renderMetric("🌬️", "Raffica", formatUnit(station.gustKmh, "km/h", 1)),
+    renderMetric("🌧️", "Intensità pioggia", formatUnit(station.rainRate, "mm/h", 2)),
+    renderMetric("☔", "Pioggia ultima ora", formatUnit(station.rain60min, "mm", 2)),
+    renderMetric("🌦️", "Pioggia accumulata", formatUnit(station.rainAccum, "mm", 2)),
+    renderMetric("⛰️", "Quota", formatUnit(station.altitude, "m", 0)),
+    renderMetric("📍", "Coordinate", formatCoordinates(station.lat, station.lon), true)
+  ].filter(Boolean);
+
+  if (!metrics.length) {
+    return '<div class="station-metrics-empty">Altri dati non disponibili</div>';
+  }
+
+  return metrics.join("");
+}
+
+function renderModalFreshness(station) {
+  const freshness = freshnessInfo(station);
+  const dateTime = formatDateTime(station.updatedAt);
+  const text = dateTime === null
+    ? "Ora dell’ultimo dato non disponibile"
+    : `Ultimo dato: ${dateTime} · ${freshness.label}`;
+
+  return `
+    <div class="station-modal-time ${freshness.className}">
+      <i class="fresh-dot ${freshness.className}"></i>
+      <span>${escapeHtml(text)}</span>
+    </div>
+  `;
 }
 
 function renderStationStatus(station) {
@@ -468,13 +641,21 @@ function openStationModal(stationKey, trigger) {
   const source = sourceInfo(station).label;
   const freshness = freshnessInfo(station).label;
   const qualityNote = QUALITY_NOTES[station.key];
+  const group = groupForStation(station.key);
 
   lastModalTrigger = trigger || null;
+  stationModal.dataset.area = group?.id || "default";
   stationModalTitle.textContent = stationShortName(station);
   stationModalSubtitle.textContent = `${source} · ${role} · ${freshness}`;
   stationModalBody.innerHTML = `
     ${renderStationStatus(station)}
+    <div class="station-modal-primary">
+      <span class="station-modal-temperature">${escapeHtml(formatCompactTemperature(station.temp))}</span>
+      <span class="station-modal-humidity">💧 ${escapeHtml(formatCompactHumidity(station.humidity))}</span>
+    </div>
+    ${renderTemperatureScale(station)}
     <div class="station-modal-readings">${renderDetails(station)}</div>
+    ${renderModalFreshness(station)}
     ${qualityNote
       ? `<p class="quality-note">${escapeHtml(qualityNote)}</p>`
       : ""}
