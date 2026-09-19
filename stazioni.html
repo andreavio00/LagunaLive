@@ -7,7 +7,7 @@
   <title>Stazioni amatoriali — LagunaLive</title>
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="stazioni.css?v=1.8">
+  <link rel="stylesheet" href="stazioni.css?v=1.9">
 </head>
 
 <body>
@@ -28,9 +28,6 @@
       <div class="overview-actions">
         <button class="secondary-button" id="refreshButton" type="button">
           ↻ Aggiorna
-        </button>
-        <button class="primary-button" id="toggleAllButton" type="button" aria-pressed="false">
-          Mostra tutte
         </button>
       </div>
     </section>
@@ -75,6 +72,15 @@
     Dati pubblici Netatmo, Weathercloud e Weather Underground · aggiornamento automatico ogni 5 minuti
   </footer>
 
-  <script src="stazioni.js?v=1.8"></script>
+  <div id="stationModalOverlay" class="station-modal-overlay" aria-hidden="true">
+    <section class="station-modal" role="dialog" aria-modal="true" aria-labelledby="stationModalTitle">
+      <button id="stationModalClose" class="station-modal-close" type="button" aria-label="Chiudi">✕</button>
+      <h2 id="stationModalTitle">Stazione</h2>
+      <p id="stationModalSubtitle" class="station-modal-subtitle"></p>
+      <div id="stationModalBody"></div>
+    </section>
+  </div>
+
+  <script src="stazioni.js?v=1.9"></script>
 </body>
 </html>

@@ -5,8 +5,6 @@ const WEATHERCLOUD_URL =
 const WUNDERGROUND_URL =
   "https://weathercloude-worker.andrea-vio.workers.dev/wunderground/selected";
 
-const VIEW_STORAGE_KEY = "lagunalive-amateur-show-all-v1";
-const GROUP_STORAGE_KEY = "lagunalive-amateur-expanded-groups-v1";
 const SOURCE_CACHE_PREFIX = "lagunalive-amateur-source-cache-v1-";
 const SOURCE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -18,21 +16,6 @@ const SOURCES = [
 ];
 
 const keyOf = (source, id) => `${source}|${id}`;
-
-const DEFAULT_VISIBLE_KEYS = new Set([
-  keyOf("wunderground", "IVENIC160"),
-  keyOf("weathercloud", "2414314087"),
-  keyOf("weathercloud", "2591958863"),
-  keyOf("weathercloud", "2361312782"),
-  keyOf("netatmo", "70:ee:50:af:5a:52"),
-  keyOf("netatmo", "70:ee:50:af:3d:96"),
-  keyOf("netatmo", "70:ee:50:bf:7e:5a"),
-  keyOf("netatmo", "70:ee:50:2b:02:64"),
-  keyOf("weathercloud", "9454656179"),
-  keyOf("weathercloud", "8414577935"),
-  keyOf("netatmo", "70:ee:50:c3:8f:28"),
-  keyOf("netatmo", "70:ee:50:b4:e8:0a")
-]);
 
 const GROUPS = [
   {
@@ -64,10 +47,10 @@ const GROUPS = [
     shortTitle: "Venezia centro",
     areaClass: "area-center",
     keys: [
-      keyOf("netatmo", "70:ee:50:af:3d:96"),
-      keyOf("netatmo", "70:ee:50:bf:7e:5a"),
       keyOf("netatmo", "70:ee:50:2b:02:64"),
-      keyOf("netatmo", "70:ee:50:c3:8f:28")
+      keyOf("netatmo", "70:ee:50:c3:8f:28"),
+      keyOf("netatmo", "70:ee:50:bf:7e:5a"),
+      keyOf("netatmo", "70:ee:50:af:3d:96")
     ]
   },
   {
@@ -77,8 +60,8 @@ const GROUPS = [
     areaClass: "area-lagoon",
     keys: [
       keyOf("netatmo", "70:ee:50:af:5a:52"),
-      keyOf("netatmo", "70:ee:50:2a:dd:e8"),
       keyOf("weathercloud", "9454656179"),
+      keyOf("netatmo", "70:ee:50:2a:dd:e8"),
       keyOf("weathercloud", "8414577935"),
       keyOf("netatmo", "70:ee:50:b4:e8:0a")
     ]
@@ -89,21 +72,6 @@ const GROUPS = [
     shortTitle: "Sentinella",
     areaClass: "area-sentinel",
     keys: [keyOf("netatmo", "70:ee:50:b5:49:38")]
-  }
-];
-
-const AUTO_FALLBACKS = [
-  {
-    primary: keyOf("weathercloud", "2591958863"),
-    fallback: keyOf("netatmo", "70:ee:50:af:81:0c")
-  },
-  {
-    primary: keyOf("netatmo", "70:ee:50:af:5a:52"),
-    fallback: keyOf("netatmo", "70:ee:50:2a:dd:e8")
-  },
-  {
-    primary: keyOf("weathercloud", "9454656179"),
-    fallback: keyOf("weathercloud", "8414577935")
   }
 ];
 
@@ -132,7 +100,7 @@ const QUALITY_NOTES = {
 // quindi non serve ripeterla su ogni scheda.
 const SHORT_NAMES = {
   [keyOf("wunderground", "IVENIC160")]: "S. Alvise",
-  [keyOf("weathercloud", "2414314087")]: "Staz. meteo",
+  [keyOf("weathercloud", "2414314087")]: "F.te Nove",
   [keyOf("netatmo", "70:ee:50:3e:ee:22")]: "S. Caterina",
   [keyOf("netatmo", "70:ee:50:a4:41:c6")]: "Le Vele",
   [keyOf("weathercloud", "2591958863")]: "TcMurano",
@@ -144,9 +112,9 @@ const SHORT_NAMES = {
   [keyOf("weathercloud", "8414577935")]: "Lido centro",
   [keyOf("netatmo", "70:ee:50:b4:e8:0a")]: "Pellestrina",
   [keyOf("netatmo", "70:ee:50:af:3d:96")]: "S. Margherita",
-  [keyOf("netatmo", "70:ee:50:bf:7e:5a")]: "Fabbri",
-  [keyOf("netatmo", "70:ee:50:2b:02:64")]: "Le Pute",
-  [keyOf("netatmo", "70:ee:50:c3:8f:28")]: "Ruga Bela",
+  [keyOf("netatmo", "70:ee:50:bf:7e:5a")]: "Calle dei Fabbri",
+  [keyOf("netatmo", "70:ee:50:2b:02:64")]: "Campo della Tana",
+  [keyOf("netatmo", "70:ee:50:c3:8f:28")]: "Frari",
   [keyOf("netatmo", "70:ee:50:b5:49:38")]: "Rododendri"
 };
 
@@ -181,9 +149,6 @@ const PLACEHOLDER_METADATA = {
 
 const state = {
   stations: [],
-  showAll: localStorage.getItem(VIEW_STORAGE_KEY) === "1",
-  expandedGroups: readExpandedGroups(),
-  autoVisible: new Set(),
   sourceErrors: [],
   loadedAt: null
 };
@@ -192,9 +157,14 @@ const stationGroups = document.getElementById("stationGroups");
 const zoneNav = document.getElementById("zoneNav");
 const overviewCount = document.getElementById("overviewCount");
 const overviewTime = document.getElementById("overviewTime");
-const toggleAllButton = document.getElementById("toggleAllButton");
 const refreshButton = document.getElementById("refreshButton");
 const sourceWarning = document.getElementById("sourceWarning");
+const stationModalOverlay = document.getElementById("stationModalOverlay");
+const stationModalTitle = document.getElementById("stationModalTitle");
+const stationModalSubtitle = document.getElementById("stationModalSubtitle");
+const stationModalBody = document.getElementById("stationModalBody");
+const stationModalClose = document.getElementById("stationModalClose");
+let lastModalTrigger = null;
 
 async function fetchStationList(url) {
   const controller = new AbortController();
@@ -291,7 +261,6 @@ async function loadStations({ manual = false } = {}) {
     .sort((a, b) => a.networkOrder - b.networkOrder);
   state.sourceErrors = errors;
   state.loadedAt = new Date();
-  computeAutomaticFallbacks();
   renderPage();
 
   refreshButton.disabled = false;
@@ -326,26 +295,6 @@ function normalizeStation(station) {
   };
 }
 
-function computeAutomaticFallbacks() {
-  state.autoVisible = new Set();
-  const stationsByKey = new Map(
-    state.stations.map((station) => [station.key, station])
-  );
-
-  AUTO_FALLBACKS.forEach(({ primary, fallback }) => {
-    const primaryStation = stationsByKey.get(primary);
-    const fallbackStation = stationsByKey.get(fallback);
-
-    if (
-      fallbackStation &&
-      !isUnavailable(fallbackStation) &&
-      isUnavailable(primaryStation)
-    ) {
-      state.autoVisible.add(fallback);
-    }
-  });
-}
-
 function isUnavailable(station) {
   return !station || Boolean(station.error) || Boolean(station.stale);
 }
@@ -361,28 +310,20 @@ function renderPage() {
   stationGroups.innerHTML = renderedGroups ||
     '<div class="empty-card">Nessuna stazione disponibile.</div>';
 
-  const visibleCount = countVisibleStations();
   const total = state.stations.length;
   const staleCount = state.stations.filter(isUnavailable).length;
-
-  const viewLabel = state.showAll
-    ? "Vista completa"
-    : visibleCount === DEFAULT_VISIBLE_KEYS.size
-      ? "Vista essenziale"
-      : "Vista personalizzata";
+  const staleLabel = staleCount === 1
+    ? " · 1 non aggiornata"
+    : staleCount > 1
+      ? ` · ${staleCount} non aggiornate`
+      : "";
 
   overviewCount.textContent =
-    `${viewLabel} · ${visibleCount} di ${total} stazioni` +
-    (staleCount ? ` · ${staleCount} non aggiornate` : "");
+    `${total} stazioni${staleLabel}`;
 
   overviewTime.textContent = state.loadedAt
     ? `Ultimo controllo alle ${formatClock(state.loadedAt)}`
     : "";
-
-  toggleAllButton.textContent = state.showAll
-    ? "Vista essenziale"
-    : `Mostra tutte (${total})`;
-  toggleAllButton.setAttribute("aria-pressed", String(state.showAll));
 
   showSourceErrors(state.sourceErrors);
 }
@@ -406,46 +347,18 @@ function renderGroup(group) {
 
   if (!groupStations.length) return "";
 
-  const expanded = state.showAll || state.expandedGroups.has(group.id);
-  const visibleStations = groupStations.filter(
-    (station) =>
-      expanded ||
-      DEFAULT_VISIBLE_KEYS.has(station.key) ||
-      state.autoVisible.has(station.key)
-  );
-  const normallyHidden = groupStations.filter(
-    (station) =>
-      !DEFAULT_VISIBLE_KEYS.has(station.key) &&
-      !state.autoVisible.has(station.key)
-  );
-  const hiddenCount = groupStations.length - visibleStations.length;
-
-  let toggle = "";
-
-  if (!state.showAll && normallyHidden.length) {
-    const action = state.expandedGroups.has(group.id)
-      ? "Nascondi stazioni aggiuntive"
-      : hiddenCount === 1
-        ? `Mostra anche ${escapeHtml(stationShortName(normallyHidden[0]))}`
-        : `Mostra altre ${hiddenCount} stazioni`;
-
-    toggle =
-      `<button class="group-toggle" type="button" data-group-toggle="${escapeHtml(group.id)}">${action}</button>`;
-  }
-
   return `
     <section class="station-group ${escapeHtml(group.areaClass)}" id="group-${escapeHtml(group.id)}">
       <div class="group-header">
         <h2>${escapeHtml(group.title)}</h2>
-        <span class="group-count">${visibleStations.length} di ${groupStations.length}</span>
+        <span class="group-count">${groupStations.length} stazioni</span>
       </div>
       <div class="station-grid">
-        ${visibleStations.map(renderStationCard).join("")}
+        ${groupStations.map(renderStationCard).join("")}
       </div>
-      ${visibleStations.length > 2
+      ${groupStations.length > 2
         ? '<div class="station-swipe-hint" aria-hidden="true">Scorri per le altre stazioni →</div>'
         : ""}
-      ${toggle}
     </section>
   `;
 }
@@ -455,31 +368,14 @@ function renderStationCard(station) {
   const roleClass = ROLE_LABELS[station.networkRole]
     ? station.networkRole
     : "supporto";
-  const sourceMeta = {
-    netatmo: { label: "Netatmo", className: "netatmo" },
-    weathercloud: { label: "Weathercloud", className: "weathercloud" },
-    wunderground: { label: "W. Underground", className: "wunderground" }
-  }[station.source] || { label: station.source || "Fonte", className: "other" };
+  const sourceMeta = sourceInfo(station);
   const freshness = freshnessInfo(station);
-  const fullName = station.displayName || station.name || station.id;
   const shortName = stationShortName(station);
-  const detailsId = `details-${station.key.replace(/[^a-z0-9]+/gi, "-")}`;
-  const qualityNote = QUALITY_NOTES[station.key];
-  const isAutoShown = state.autoVisible.has(station.key) &&
-    !DEFAULT_VISIBLE_KEYS.has(station.key);
-
-  const alert = station.sourcePlaceholder || station.sourceFallback
-    ? ""
-    : station.error
-      ? `<div class="station-alert error">${escapeHtml(station.error)}</div>`
-      : station.stale
-        ? '<div class="station-alert">Dato non recente: confrontare con un’altra stazione della zona.</div>'
-        : "";
 
   return `
-    <article class="station-card role-${escapeHtml(roleClass)} ${station.error ? "station-error" : ""}" aria-label="${escapeHtml(fullName)}">
+    <article class="station-card role-${escapeHtml(roleClass)} ${station.error ? "station-error" : ""}" aria-label="${escapeHtml(shortName)}">
       <div class="station-head">
-        <h3 title="${escapeHtml(fullName)}">${escapeHtml(shortName)}</h3>
+        <h3 title="${escapeHtml(shortName)}">${escapeHtml(shortName)}</h3>
         <span class="badge badge-source-${escapeHtml(sourceMeta.className)}">${escapeHtml(sourceMeta.label)}</span>
       </div>
 
@@ -490,25 +386,22 @@ function renderStationCard(station) {
 
       <div class="station-meta">
         <span class="freshness"><i class="fresh-dot ${freshness.className}"></i>${escapeHtml(freshness.label)}</span>
-        <span class="station-role">${isAutoShown ? "Supporto auto" : escapeHtml(role)}</span>
+        <span class="station-role">${escapeHtml(role)}</span>
       </div>
 
-      ${alert}
-
-      <button class="details-toggle" type="button" data-details-toggle="${detailsId}" aria-expanded="false">
+      <button class="details-toggle" type="button" data-station-details="${escapeHtml(station.key)}">
         Dettagli
       </button>
-      <div class="station-details" id="${detailsId}" hidden>
-        ${renderDetails(station)}
-        ${qualityNote
-          ? `<p class="quality-note">${escapeHtml(qualityNote)}</p>`
-          : ""}
-        ${station.mapUrl
-          ? `<a class="source-link" href="${safeUrl(station.mapUrl)}" target="_blank" rel="noopener">Apri la pagina originale ↗</a>`
-          : ""}
-      </div>
     </article>
   `;
+}
+
+function sourceInfo(station) {
+  return {
+    netatmo: { label: "Netatmo", className: "netatmo" },
+    weathercloud: { label: "Weathercloud", className: "weathercloud" },
+    wunderground: { label: "W. Underground", className: "wunderground" }
+  }[station.source] || { label: station.source || "Fonte", className: "other" };
 }
 
 function stationShortName(station) {
@@ -525,6 +418,7 @@ function formatCompactHumidity(value) {
 
 function renderDetails(station) {
   const rows = [
+    ["Temperatura", formatTemperature(station.temp)],
     ["Umidità", formatUnit(station.humidity, "%", 0)],
     ["Punto di rugiada", formatTemperature(station.dewPoint)],
     ["Pressione", formatUnit(station.pressure, "hPa", 1)],
@@ -550,6 +444,59 @@ function renderDetails(station) {
     .join("");
 }
 
+function renderStationStatus(station) {
+  if (station.error) {
+    return `<div class="station-alert error">${escapeHtml(station.error)}</div>`;
+  }
+
+  if (station.sourceFallback) {
+    return '<div class="station-alert">Ultimo dato salvato: la fonte è temporaneamente non disponibile.</div>';
+  }
+
+  if (station.stale) {
+    return '<div class="station-alert">Dato non recente: confrontare con un’altra stazione della zona.</div>';
+  }
+
+  return "";
+}
+
+function openStationModal(stationKey, trigger) {
+  const station = state.stations.find((item) => item.key === stationKey);
+  if (!station) return;
+
+  const role = ROLE_LABELS[station.networkRole] || "Stazione";
+  const source = sourceInfo(station).label;
+  const freshness = freshnessInfo(station).label;
+  const qualityNote = QUALITY_NOTES[station.key];
+
+  lastModalTrigger = trigger || null;
+  stationModalTitle.textContent = stationShortName(station);
+  stationModalSubtitle.textContent = `${source} · ${role} · ${freshness}`;
+  stationModalBody.innerHTML = `
+    ${renderStationStatus(station)}
+    <div class="station-modal-readings">${renderDetails(station)}</div>
+    ${qualityNote
+      ? `<p class="quality-note">${escapeHtml(qualityNote)}</p>`
+      : ""}
+    ${station.mapUrl
+      ? `<a class="source-link" href="${safeUrl(station.mapUrl)}" target="_blank" rel="noopener">Apri la pagina originale ↗</a>`
+      : ""}
+  `;
+
+  stationModalOverlay.classList.add("open");
+  stationModalOverlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("station-modal-open");
+  stationModalClose.focus();
+}
+
+function closeStationModal() {
+  stationModalOverlay.classList.remove("open");
+  stationModalOverlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("station-modal-open");
+  lastModalTrigger?.focus();
+  lastModalTrigger = null;
+}
+
 function freshnessInfo(station) {
   if (station.error) {
     return { className: "old", label: "non disponibile" };
@@ -573,16 +520,6 @@ function freshnessInfo(station) {
   }
 
   return { className: "aging", label: `${age} min fa` };
-}
-
-function countVisibleStations() {
-  return state.stations.filter((station) => {
-    const group = GROUPS.find((item) => item.keys.includes(station.key));
-    return state.showAll ||
-      DEFAULT_VISIBLE_KEYS.has(station.key) ||
-      state.autoVisible.has(station.key) ||
-      (group && state.expandedGroups.has(group.id));
-  }).length;
 }
 
 function showSourceErrors(errors) {
@@ -679,22 +616,6 @@ function buildSourcePlaceholders(source) {
     });
 }
 
-function readExpandedGroups() {
-  try {
-    const value = JSON.parse(localStorage.getItem(GROUP_STORAGE_KEY) || "[]");
-    return new Set(Array.isArray(value) ? value : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveExpandedGroups() {
-  localStorage.setItem(
-    GROUP_STORAGE_KEY,
-    JSON.stringify([...state.expandedGroups])
-  );
-}
-
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
@@ -784,44 +705,27 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-toggleAllButton.addEventListener("click", () => {
-  state.showAll = !state.showAll;
-  localStorage.setItem(VIEW_STORAGE_KEY, state.showAll ? "1" : "0");
-  renderPage();
-});
-
 refreshButton.addEventListener("click", () => {
   loadStations({ manual: true });
 });
 
 stationGroups.addEventListener("click", (event) => {
-  const groupButton = event.target.closest("[data-group-toggle]");
-
-  if (groupButton) {
-    const groupId = groupButton.dataset.groupToggle;
-
-    if (state.expandedGroups.has(groupId)) {
-      state.expandedGroups.delete(groupId);
-    } else {
-      state.expandedGroups.add(groupId);
-    }
-
-    saveExpandedGroups();
-    renderPage();
-    document.getElementById(`group-${groupId}`)?.scrollIntoView({ block: "start" });
-    return;
-  }
-
-  const detailsButton = event.target.closest("[data-details-toggle]");
+  const detailsButton = event.target.closest("[data-station-details]");
 
   if (detailsButton) {
-    const details = document.getElementById(detailsButton.dataset.detailsToggle);
-    if (!details) return;
+    openStationModal(detailsButton.dataset.stationDetails, detailsButton);
+  }
+});
 
-    const opening = details.hidden;
-    details.hidden = !opening;
-    detailsButton.setAttribute("aria-expanded", String(opening));
-    detailsButton.textContent = opening ? "Chiudi" : "Dettagli";
+stationModalClose.addEventListener("click", closeStationModal);
+
+stationModalOverlay.addEventListener("click", (event) => {
+  if (event.target === stationModalOverlay) closeStationModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && stationModalOverlay.classList.contains("open")) {
+    closeStationModal();
   }
 });
 
