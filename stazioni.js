@@ -7,7 +7,15 @@ const WUNDERGROUND_URL =
 
 const VIEW_STORAGE_KEY = "lagunalive-amateur-show-all-v1";
 const GROUP_STORAGE_KEY = "lagunalive-amateur-expanded-groups-v1";
+const SOURCE_CACHE_PREFIX = "lagunalive-amateur-source-cache-v1-";
+const SOURCE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+const SOURCES = [
+  { id: "netatmo", label: "Netatmo", url: NETATMO_URL },
+  { id: "weathercloud", label: "Weathercloud", url: WEATHERCLOUD_URL },
+  { id: "wunderground", label: "Weather Underground", url: WUNDERGROUND_URL }
+];
 
 const keyOf = (source, id) => `${source}|${id}`;
 
@@ -149,6 +157,28 @@ const ROLE_LABELS = {
   sentinella: "Sentinella"
 };
 
+// Mantiene ruolo e ordinamento corretti anche quando una fonte è assente
+// e la pagina deve costruire temporaneamente una scheda senza valori.
+const PLACEHOLDER_METADATA = {
+  [keyOf("wunderground", "IVENIC160")]: ["principale", 0.5],
+  [keyOf("weathercloud", "2414314087")]: ["principale", 1],
+  [keyOf("netatmo", "70:ee:50:3e:ee:22")]: ["supporto", 2],
+  [keyOf("netatmo", "70:ee:50:a4:41:c6")]: ["supporto", 2.5],
+  [keyOf("weathercloud", "2591958863")]: ["principale", 3],
+  [keyOf("weathercloud", "2361312782")]: ["supporto", 4],
+  [keyOf("netatmo", "70:ee:50:af:81:0c")]: ["supporto", 5],
+  [keyOf("netatmo", "70:ee:50:af:5a:52")]: ["principale", 6],
+  [keyOf("netatmo", "70:ee:50:2a:dd:e8")]: ["supporto", 7],
+  [keyOf("netatmo", "70:ee:50:b4:e8:0a")]: ["sperimentale", 8],
+  [keyOf("weathercloud", "9454656179")]: ["principale", 9],
+  [keyOf("weathercloud", "8414577935")]: ["supporto", 10],
+  [keyOf("netatmo", "70:ee:50:af:3d:96")]: ["principale", 11],
+  [keyOf("netatmo", "70:ee:50:bf:7e:5a")]: ["principale", 12],
+  [keyOf("netatmo", "70:ee:50:2b:02:64")]: ["principale", 13],
+  [keyOf("netatmo", "70:ee:50:c3:8f:28")]: ["supporto", 13.5],
+  [keyOf("netatmo", "70:ee:50:b5:49:38")]: ["sentinella", 15]
+};
+
 const state = {
   stations: [],
   showAll: localStorage.getItem(VIEW_STORAGE_KEY) === "1",
@@ -186,7 +216,7 @@ async function fetchStationList(url) {
 
   const payload = await response.json();
 
-  if (!Array.isArray(payload)) {
+  if (!Array.isArray(payload) || !payload.length) {
     throw new Error("Risposta non valida");
   }
 
@@ -202,21 +232,46 @@ async function loadStations({ manual = false } = {}) {
       '<div class="loading-card">Caricamento delle stazioni…</div>';
   }
 
-  const results = await Promise.allSettled([
-    fetchStationList(NETATMO_URL),
-    fetchStationList(WEATHERCLOUD_URL),
-    fetchStationList(WUNDERGROUND_URL)
-  ]);
+  const results = await Promise.allSettled(
+    SOURCES.map((source) => fetchStationList(source.url))
+  );
 
-  const sourceNames = ["Netatmo", "Weathercloud", "Weather Underground"];
   const loaded = [];
   const errors = [];
 
   results.forEach((result, index) => {
+    const source = SOURCES[index];
+
     if (result.status === "fulfilled") {
       loaded.push(...result.value);
+      saveSourceCache(source.id, result.value);
+
+      if (result.value.some((station) => station.sourceFallback)) {
+        errors.push(
+          `${source.label}: sono mostrati gli ultimi dati validi conservati.`
+        );
+      }
     } else {
-      errors.push(`${sourceNames[index]}: ${result.reason.message}`);
+      const savedStations = readSourceCache(source.id);
+      const currentStations = state.stations.filter(
+        (station) => station.source === source.id && !station.sourcePlaceholder
+      );
+      const fallbackStations = savedStations.length
+        ? savedStations
+        : currentStations;
+      const reason = result.reason?.message || "errore sconosciuto";
+
+      if (fallbackStations.length) {
+        loaded.push(...markSourceFallback(fallbackStations));
+        errors.push(
+          `${source.label}: ${reason}. Sono mostrati gli ultimi dati salvati.`
+        );
+      } else {
+        loaded.push(...buildSourcePlaceholders(source));
+        errors.push(
+          `${source.label}: ${reason}. Le schede restano visibili senza valori.`
+        );
+      }
     }
   });
 
@@ -246,13 +301,15 @@ async function loadStations({ manual = false } = {}) {
 function normalizeStation(station) {
   const source = String(station.source || "").toLowerCase();
   const windFactor = source === "weathercloud" ? 3.6 : 1;
+  const ageMinutes = calculateAgeMinutes(station);
 
   return {
     ...station,
     source,
     key: keyOf(source, station.id),
     networkOrder: numberOrNull(station.networkOrder) ?? 999,
-    ageMinutes: numberOrNull(station.ageMinutes),
+    ageMinutes,
+    stale: Boolean(station.stale) || (ageMinutes !== null && ageMinutes > 90),
     temp: numberOrNull(station.temp),
     humidity: numberOrNull(station.humidity),
     dewPoint: numberOrNull(station.dewPoint),
@@ -279,7 +336,11 @@ function computeAutomaticFallbacks() {
     const primaryStation = stationsByKey.get(primary);
     const fallbackStation = stationsByKey.get(fallback);
 
-    if (fallbackStation && isUnavailable(primaryStation)) {
+    if (
+      fallbackStation &&
+      !isUnavailable(fallbackStation) &&
+      isUnavailable(primaryStation)
+    ) {
       state.autoVisible.add(fallback);
     }
   });
@@ -402,16 +463,18 @@ function renderStationCard(station) {
   const freshness = freshnessInfo(station);
   const fullName = station.displayName || station.name || station.id;
   const shortName = stationShortName(station);
-  const detailsId = `details-${String(station.networkOrder).replace(/[^0-9]/g, "")}`;
+  const detailsId = `details-${station.key.replace(/[^a-z0-9]+/gi, "-")}`;
   const qualityNote = QUALITY_NOTES[station.key];
   const isAutoShown = state.autoVisible.has(station.key) &&
     !DEFAULT_VISIBLE_KEYS.has(station.key);
 
-  const alert = station.error
-    ? `<div class="station-alert error">${escapeHtml(station.error)}</div>`
-    : station.stale
-      ? '<div class="station-alert">Dato non recente: confrontare con un’altra stazione della zona.</div>'
-      : "";
+  const alert = station.sourcePlaceholder || station.sourceFallback
+    ? ""
+    : station.error
+      ? `<div class="station-alert error">${escapeHtml(station.error)}</div>`
+      : station.stale
+        ? '<div class="station-alert">Dato non recente: confrontare con un’altra stazione della zona.</div>'
+        : "";
 
   return `
     <article class="station-card role-${escapeHtml(roleClass)} ${station.error ? "station-error" : ""}" aria-label="${escapeHtml(fullName)}">
@@ -424,8 +487,6 @@ function renderStationCard(station) {
         <span class="primary-temperature">${escapeHtml(formatCompactTemperature(station.temp))}</span>
         <span class="primary-humidity">💧 ${escapeHtml(formatCompactHumidity(station.humidity))}</span>
       </div>
-
-      ${renderCompactRain(station)}
 
       <div class="station-meta">
         <span class="freshness"><i class="fresh-dot ${freshness.className}"></i>${escapeHtml(freshness.label)}</span>
@@ -460,22 +521,6 @@ function formatCompactTemperature(value) {
 
 function formatCompactHumidity(value) {
   return value === null ? "—" : `${formatNumber(value, 0)}%`;
-}
-
-function renderCompactRain(station) {
-  const rate = formatUnit(station.rainRate, "mm/h", 2);
-  const total = formatUnit(station.rainAccum, "mm", 2);
-
-  if (rate === null && total === null) {
-    return '<div class="station-rain station-rain-empty">🌧 Pioggia n.d.</div>';
-  }
-
-  return `
-    <div class="station-rain">
-      <span>🌧 ora <strong>${escapeHtml(rate ?? "—")}</strong></span>
-      <span>24 h <strong>${escapeHtml(total ?? "—")}</strong></span>
-    </div>
-  `;
 }
 
 function renderDetails(station) {
@@ -547,9 +592,91 @@ function showSourceErrors(errors) {
     return;
   }
 
+  const subject = errors.length === 1
+    ? "Una fonte è temporaneamente non disponibile."
+    : "Alcune fonti sono temporaneamente non disponibili.";
+
   sourceWarning.textContent =
-    `Una fonte non è disponibile; la pagina mostra gli altri dati. ${errors.join(" · ")}`;
+    `${subject} Le altre continuano ad aggiornarsi. ${errors.join(" · ")}`;
   sourceWarning.classList.add("visible");
+}
+
+function saveSourceCache(sourceId, stations) {
+  try {
+    localStorage.setItem(
+      `${SOURCE_CACHE_PREFIX}${sourceId}`,
+      JSON.stringify({ savedAt: Date.now(), stations })
+    );
+  } catch {
+    // La pagina continua a funzionare anche se lo spazio locale è disattivato.
+  }
+}
+
+function readSourceCache(sourceId) {
+  const storageKey = `${SOURCE_CACHE_PREFIX}${sourceId}`;
+
+  try {
+    const cached = JSON.parse(localStorage.getItem(storageKey) || "null");
+    const savedAt = numberOrNull(cached?.savedAt);
+
+    if (
+      savedAt === null ||
+      Date.now() - savedAt > SOURCE_CACHE_MAX_AGE_MS ||
+      !Array.isArray(cached?.stations) ||
+      !cached.stations.length
+    ) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // Ignora: la cache locale può essere bloccata dal browser.
+      }
+      return [];
+    }
+
+    return cached.stations;
+  } catch {
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // Ignora: la pagina userà le schede segnaposto.
+    }
+    return [];
+  }
+}
+
+function markSourceFallback(stations) {
+  return stations.map((station) => ({
+    ...station,
+    sourceFallback: true,
+    stale: true
+  }));
+}
+
+function buildSourcePlaceholders(source) {
+  const configuredKeys = [...new Set(GROUPS.flatMap((group) => group.keys))];
+
+  return configuredKeys
+    .filter((key) => key.startsWith(`${source.id}|`))
+    .map((key, index) => {
+      const id = key.slice(key.indexOf("|") + 1);
+      const name = SHORT_NAMES[key] || id;
+      const [networkRole, networkOrder] = PLACEHOLDER_METADATA[key] || [
+        "supporto",
+        900 + index
+      ];
+
+      return {
+        id,
+        source: source.id,
+        name,
+        displayName: name,
+        networkRole,
+        networkOrder,
+        stale: true,
+        sourcePlaceholder: true,
+        error: `${source.label}: dati temporaneamente non disponibili`
+      };
+    });
 }
 
 function readExpandedGroups() {
@@ -572,6 +699,16 @@ function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function calculateAgeMinutes(station) {
+  const reportedAge = numberOrNull(station.ageMinutes);
+  const updatedAt = numberOrNull(station.updatedAt);
+
+  if (updatedAt === null) return reportedAge;
+
+  const elapsedAge = Math.max(0, Math.floor((Date.now() - updatedAt) / 60000));
+  return reportedAge === null ? elapsedAge : Math.max(reportedAge, elapsedAge);
 }
 
 function multiplyOrNull(value, factor) {
