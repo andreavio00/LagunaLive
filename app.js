@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v3.4";
+const APP_VERSION = "v3.9";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -598,10 +598,39 @@ async function loadCannaregioPalestra() {
   }
 }
 
+// A differenza delle altre fonti (Cavalli/Punta Salute/Misericordia
+// passano dal Worker; Lido Meteo ha un fallback a 4 livelli), fino alla
+// v3.9 questa funzione chiamava ARPA Veneto direttamente dal telefono,
+// senza timeout e senza controllo di response.ok. Su reti mobili dove
+// quella chiamata diretta viene bloccata/rallentata (es. filtri
+// anti-abuso lato ARPA su certi range IP degli operatori, o traduzione
+// IPv6->IPv4 instabile sul 5G) l'errore andava a bloccare l'intero
+// Promise.all di loadAll(), facendo sparire anche Cavalli/Punta
+// Salute/Misericordia insieme a Cavanis. Ora si tenta prima via Worker
+// (la richiesta parte dall'IP del Worker, non dal telefono) e solo se
+// fallisce si ricade sulla chiamata diretta - bug reale riscontrato il
+// 19/09/2026 (funzionava su WiFi e su un secondo telefono/operatore,
+// falliva sempre sui dati mobili di un telefono in particolare).
 async function loadCavanis() {
 
-  const response = await fetch(CAVANIS_API_URL);
-  const json = await response.json();
+  const sources = [proxyUrl(CAVANIS_API_URL), CAVANIS_API_URL];
+
+  let json = null;
+
+  for (const url of sources) {
+    try {
+      const response = await fetchWithTimeout(url, 8000);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      json = await response.json();
+      break;
+    } catch (err) {
+      console.warn("Cavanis: fonte fallita (" + url + "):", err);
+    }
+  }
+
+  if (!json) {
+    throw new Error("Cavanis: nessuna fonte disponibile");
+  }
 
   const data = json.data;
 
