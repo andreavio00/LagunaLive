@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-<!-- ATTENZIONE: il numero "?v=3.3" qui e in app.js va aggiornato
+<!-- ATTENZIONE: il numero "?v=3.4" qui e in app.js va aggiornato
      insieme a APP_VERSION (in app.js) e CACHE_NAME (in sw.js) ad ogni
      rilascio. Senza questo numero nell'indirizzo, il browser puo'
      continuare a servire una copia di style.css dalla propria cache
@@ -25,7 +25,7 @@
      l'indirizzo del file diverso da quello precedente, obbligando il
      browser a scaricarlo di nuovo indipendentemente da qualsiasi
      intestazione di cache del server. -->
-<link rel="stylesheet" href="style.css?v=3.3">
+<link rel="stylesheet" href="style.css?v=3.4">
 </head>
 
 <body>
@@ -47,7 +47,7 @@
 
     <div class="sub-stations">
         <div class="sub-station clickable" id="subCavalli">Palazzo Cavalli: -- (--)</div>
-        <div class="sub-station clickable" id="subPalestra">Cannaregio – Palestra: -- (--)</div>
+        <div class="sub-station clickable" id="subPalestra">S. Alvise: -- (--)</div>
         <div class="sub-station clickable" id="subLidoMeteo">Lido: -- (--)</div>
     </div>
 </div>
@@ -77,7 +77,7 @@
 
     <div id="humidityDetails" class="sub-stations">
         <div class="sub-station" id="humidityCavalli">Palazzo Cavalli: -- (--)</div>
-        <div class="sub-station" id="humidityPalestra">Cannaregio – Palestra: -- (--)</div>
+        <div class="sub-station" id="humidityPalestra">S. Alvise: -- (--)</div>
         <div class="sub-station" id="humidityLidoMeteo">Lido: -- (--)</div>
     </div>
 </div>
@@ -152,7 +152,7 @@
     ARPA Veneto &middot; Osservatorio Cavanis (temperatura, umidità, vento, radiazione solare)<br>
     Comune di Venezia &middot; rete CPSM (Palazzo Cavalli, Punta Salute, Misericordia)<br>
     ISPRA &middot; rete RMLV, stazione Lido (temperatura, umidità, vento, pressione, pioggia)<br>
-    Weather Underground &middot; Cannaregio – Palestra Marsico (temperatura, umidità)
+    Weather Underground &middot; S. Alvise, palestra dell’ex Umberto I (temperatura, umidità)
 </div>
 
 <div id="forceUpdateLink" class="force-update-link">🔄 Forza aggiornamento app</div>
@@ -170,11 +170,11 @@
      serve qui solo per l'anteprima "oggi" e l'avviso allarmi, nessun
      accesso al DOM al suo interno, va caricato prima di app.js che lo
      consuma in loadPrevisioniPreview(). -->
-<script src="previsioni-data.js?v=3.3"></script>
+<script src="previsioni-data.js?v=3.4"></script>
 
 <!-- Stesso numero di versione di style.css qui sopra e di
      APP_VERSION/CACHE_NAME: vedi commento su style.css per il perche'. -->
-<script src="app.js?v=3.3"></script>
+<script src="app.js?v=3.4"></script>
 
 </body>
 </html>

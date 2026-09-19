@@ -120,6 +120,28 @@ const QUALITY_NOTES = {
     "Non rappresenta Venezia insulare: serve soltanto come possibile segnale di un fronte in arrivo da ovest o nord-ovest."
 };
 
+// Nomi brevi per la vista compatta: il gruppo indica gia' la zona,
+// quindi non serve ripeterla su ogni scheda.
+const SHORT_NAMES = {
+  [keyOf("wunderground", "IVENIC160")]: "S. Alvise",
+  [keyOf("weathercloud", "2414314087")]: "Staz. meteo",
+  [keyOf("netatmo", "70:ee:50:3e:ee:22")]: "S. Caterina",
+  [keyOf("netatmo", "70:ee:50:a4:41:c6")]: "Le Vele",
+  [keyOf("weathercloud", "2591958863")]: "TcMurano",
+  [keyOf("weathercloud", "2361312782")]: "MeteoLazza",
+  [keyOf("netatmo", "70:ee:50:af:81:0c")]: "Serenella",
+  [keyOf("netatmo", "70:ee:50:af:5a:52")]: "Torcello",
+  [keyOf("netatmo", "70:ee:50:2a:dd:e8")]: "Burano",
+  [keyOf("weathercloud", "9454656179")]: "Malamocco",
+  [keyOf("weathercloud", "8414577935")]: "Lido centro",
+  [keyOf("netatmo", "70:ee:50:b4:e8:0a")]: "Pellestrina",
+  [keyOf("netatmo", "70:ee:50:af:3d:96")]: "S. Margherita",
+  [keyOf("netatmo", "70:ee:50:bf:7e:5a")]: "Fabbri",
+  [keyOf("netatmo", "70:ee:50:2b:02:64")]: "Le Pute",
+  [keyOf("netatmo", "70:ee:50:c3:8f:28")]: "Ruga Bela",
+  [keyOf("netatmo", "70:ee:50:b5:49:38")]: "Rododendri"
+};
+
 const ROLE_LABELS = {
   principale: "Principale",
   supporto: "Supporto",
@@ -343,7 +365,7 @@ function renderGroup(group) {
     const action = state.expandedGroups.has(group.id)
       ? "Nascondi stazioni aggiuntive"
       : hiddenCount === 1
-        ? `Mostra anche ${escapeHtml(normallyHidden[0].displayName || normallyHidden[0].name)}`
+        ? `Mostra anche ${escapeHtml(stationShortName(normallyHidden[0]))}`
         : `Mostra altre ${hiddenCount} stazioni`;
 
     toggle =
@@ -359,6 +381,9 @@ function renderGroup(group) {
       <div class="station-grid">
         ${visibleStations.map(renderStationCard).join("")}
       </div>
+      ${visibleStations.length > 2
+        ? '<div class="station-swipe-hint" aria-hidden="true">Scorri per le altre stazioni →</div>'
+        : ""}
       ${toggle}
     </section>
   `;
@@ -375,6 +400,8 @@ function renderStationCard(station) {
     wunderground: { label: "W. Underground", className: "wunderground" }
   }[station.source] || { label: station.source || "Fonte", className: "other" };
   const freshness = freshnessInfo(station);
+  const fullName = station.displayName || station.name || station.id;
+  const shortName = stationShortName(station);
   const detailsId = `details-${String(station.networkOrder).replace(/[^0-9]/g, "")}`;
   const qualityNote = QUALITY_NOTES[station.key];
   const isAutoShown = state.autoVisible.has(station.key) &&
@@ -384,44 +411,35 @@ function renderStationCard(station) {
     ? `<div class="station-alert error">${escapeHtml(station.error)}</div>`
     : station.stale
       ? '<div class="station-alert">Dato non recente: confrontare con un’altra stazione della zona.</div>'
-      : station.networkRole === "sperimentale" && qualityNote
-        ? `<div class="station-alert">${escapeHtml(qualityNote)}</div>`
-        : "";
+      : "";
 
   return `
-    <article class="station-card role-${escapeHtml(roleClass)} ${station.error ? "station-error" : ""}">
+    <article class="station-card role-${escapeHtml(roleClass)} ${station.error ? "station-error" : ""}" aria-label="${escapeHtml(fullName)}">
       <div class="station-head">
-        <div class="station-title">
-          <h3>${escapeHtml(station.displayName || station.name || station.id)}</h3>
-          <div class="station-sector">${escapeHtml(station.sector || station.location || "")}</div>
-        </div>
-        <div class="station-badges">
-          <span class="badge badge-source-${escapeHtml(sourceMeta.className)}">${escapeHtml(sourceMeta.label)}</span>
-          <span class="badge badge-role">${escapeHtml(role)}</span>
-        </div>
+        <h3 title="${escapeHtml(fullName)}">${escapeHtml(shortName)}</h3>
+        <span class="badge badge-source-${escapeHtml(sourceMeta.className)}">${escapeHtml(sourceMeta.label)}</span>
       </div>
 
-      <div class="freshness">
-        <i class="fresh-dot ${freshness.className}"></i>
-        <span>${escapeHtml(freshness.label)}</span>
-        ${isAutoShown ? '<span class="auto-shown">supporto automatico</span>' : ""}
+      <div class="primary-readings">
+        <span class="primary-temperature">${escapeHtml(formatCompactTemperature(station.temp))}</span>
+        <span class="primary-humidity">💧 ${escapeHtml(formatCompactHumidity(station.humidity))}</span>
       </div>
 
-      <div class="metric-grid">
-        ${metricCell("Temperatura", formatTemperature(station.temp), "metric-temperature")}
-        ${metricCell("Umidità", formatUnit(station.humidity, "%", 0))}
-        ${metricCell("Pioggia ora", formatUnit(station.rainRate, "mm/h", 2))}
-        ${metricCell("Pioggia 24 h", formatUnit(station.rainAccum, "mm", 2))}
+      ${renderCompactRain(station)}
+
+      <div class="station-meta">
+        <span class="freshness"><i class="fresh-dot ${freshness.className}"></i>${escapeHtml(freshness.label)}</span>
+        <span class="station-role">${isAutoShown ? "Supporto auto" : escapeHtml(role)}</span>
       </div>
 
       ${alert}
 
       <button class="details-toggle" type="button" data-details-toggle="${detailsId}" aria-expanded="false">
-        Mostra dettagli
+        Dettagli
       </button>
       <div class="station-details" id="${detailsId}" hidden>
         ${renderDetails(station)}
-        ${qualityNote && station.networkRole !== "sperimentale"
+        ${qualityNote
           ? `<p class="quality-note">${escapeHtml(qualityNote)}</p>`
           : ""}
         ${station.mapUrl
@@ -429,6 +447,34 @@ function renderStationCard(station) {
           : ""}
       </div>
     </article>
+  `;
+}
+
+function stationShortName(station) {
+  return SHORT_NAMES[station.key] || station.displayName || station.name || station.id;
+}
+
+function formatCompactTemperature(value) {
+  return value === null ? "—" : `${formatNumber(value, 1)}°`;
+}
+
+function formatCompactHumidity(value) {
+  return value === null ? "—" : `${formatNumber(value, 0)}%`;
+}
+
+function renderCompactRain(station) {
+  const rate = formatUnit(station.rainRate, "mm/h", 2);
+  const total = formatUnit(station.rainAccum, "mm", 2);
+
+  if (rate === null && total === null) {
+    return '<div class="station-rain station-rain-empty">🌧 Pioggia n.d.</div>';
+  }
+
+  return `
+    <div class="station-rain">
+      <span>🌧 ora <strong>${escapeHtml(rate ?? "—")}</strong></span>
+      <span>24 h <strong>${escapeHtml(total ?? "—")}</strong></span>
+    </div>
   `;
 }
 
@@ -459,16 +505,6 @@ function renderDetails(station) {
     .join("");
 }
 
-function metricCell(label, value, extraClass = "") {
-  const empty = value === null;
-  return `
-    <div class="metric ${extraClass} ${empty ? "metric-empty" : ""}">
-      <span class="metric-label">${escapeHtml(label)}</span>
-      <span class="metric-value">${escapeHtml(value ?? "—")}</span>
-    </div>
-  `;
-}
-
 function freshnessInfo(station) {
   if (station.error) {
     return { className: "old", label: "non disponibile" };
@@ -477,21 +513,21 @@ function freshnessInfo(station) {
   const age = numberOrNull(station.ageMinutes);
 
   if (age === null) {
-    return { className: "unknown", label: "ora non disponibile" };
+    return { className: "unknown", label: "ora n.d." };
   }
 
   if (station.stale || age > 90) {
-    return { className: "old", label: `aggiornata ${age} min fa` };
+    return { className: "old", label: `${age} min fa` };
   }
 
   if (age <= 30) {
     return {
       className: "fresh",
-      label: age <= 1 ? "aggiornata adesso" : `aggiornata ${age} min fa`
+      label: age <= 1 ? "adesso" : `${age} min fa`
     };
   }
 
-  return { className: "aging", label: `aggiornata ${age} min fa` };
+  return { className: "aging", label: `${age} min fa` };
 }
 
 function countVisibleStations() {
@@ -648,7 +684,7 @@ stationGroups.addEventListener("click", (event) => {
     const opening = details.hidden;
     details.hidden = !opening;
     detailsButton.setAttribute("aria-expanded", String(opening));
-    detailsButton.textContent = opening ? "Nascondi dettagli" : "Mostra dettagli";
+    detailsButton.textContent = opening ? "Chiudi" : "Dettagli";
   }
 });
 

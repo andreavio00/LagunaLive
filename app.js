@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v3.3";
+const APP_VERSION = "v3.4";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -1350,19 +1350,19 @@ function updateCannaregioPalestraUI(palestra) {
 
   document.getElementById("subPalestra").innerHTML =
     palestra.available && palestra.temperature != null
-      ? "Cannaregio – Palestra: " + palestra.temperature.toFixed(1) +
+      ? "S. Alvise: " + palestra.temperature.toFixed(1) +
         " °C" + timeText + staleText
-      : "Cannaregio – Palestra: n.d.";
+      : "S. Alvise: n.d.";
 
   document.getElementById("humidityPalestra").innerHTML =
     palestra.available && palestra.humidity != null
-      ? "Cannaregio – Palestra: " + palestra.humidity.toFixed(0) +
+      ? "S. Alvise: " + palestra.humidity.toFixed(0) +
         " %" + timeText +
         (palestra.temperature != null
           ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(palestra.temperature, palestra.humidity).toFixed(1)} °C</span>`
           : "") +
         staleText
-      : "Cannaregio – Palestra: n.d.";
+      : "S. Alvise: n.d.";
 }
 
 async function loadAll() {
@@ -1396,7 +1396,7 @@ async function loadAll() {
     loadCannaregioPalestra()
       .then(updateCannaregioPalestraUI)
       .catch(err => {
-        console.warn("Cannaregio – Palestra: dati non disponibili", err);
+        console.warn("S. Alvise: dati non disponibili", err);
         updateCannaregioPalestraUI({ available: false, stale: false });
       });
 

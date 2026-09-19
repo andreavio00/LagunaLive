@@ -326,13 +326,15 @@ button {
 
 .station-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
 }
 
 .station-card {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 11px 11px 9px;
+  padding: 9px 9px 7px;
   background: var(--surface);
   border: 1px solid rgba(20, 60, 110, 0.09);
   border-left: 5px solid var(--blue);
@@ -364,37 +366,24 @@ button {
 
 .station-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
-.station-title {
+.station-head h3 {
   min-width: 0;
-}
-
-.station-title h3 {
   margin: 0;
+  overflow: hidden;
   color: var(--navy);
-  font-size: 0.94rem;
-  line-height: 1.18;
-}
-
-.station-sector {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.station-badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
-  max-width: 45%;
+  font-size: 0.82rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
+  flex: 0 0 auto;
   padding: 3px 6px;
   border-radius: 999px;
   font-size: 0.59rem;
@@ -429,66 +418,86 @@ button {
   font-size: 0.72rem;
 }
 
-.badge-role {
-  color: #4d5966;
-  background: #edf1f4;
-}
-
-.freshness {
+.primary-readings {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 7px;
-  color: var(--muted);
-  font-size: 0.67rem;
-}
-
-.auto-shown {
-  margin-left: auto;
-  color: var(--amber);
-  font-weight: 700;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: baseline;
+  justify-content: space-between;
   gap: 7px;
-  margin-top: 9px;
+  margin-top: 8px;
 }
 
-.metric {
-  min-width: 0;
-  padding: 7px 8px;
-  background: #f7f9fb;
-  border-radius: 9px;
+.primary-temperature {
+  color: var(--blue);
+  font-size: 1.65rem;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
-.metric-label {
-  display: block;
+.primary-humidity {
   color: var(--muted);
-  font-size: 0.62rem;
-  line-height: 1.15;
-}
-
-.metric-value {
-  display: block;
-  margin-top: 2px;
-  color: var(--ink);
-  font-size: 1.02rem;
-  font-weight: 700;
-  line-height: 1.15;
+  font-size: 0.88rem;
+  font-weight: 750;
   white-space: nowrap;
 }
 
-.metric-temperature .metric-value {
-  color: var(--blue);
-  font-size: 1.36rem;
-  font-weight: 800;
+.station-rain {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 7px;
+  padding: 5px 6px;
+  color: #52606d;
+  background: #f3f7fa;
+  border-radius: 7px;
+  font-size: 0.59rem;
+  line-height: 1.2;
 }
 
-.metric-empty .metric-value {
-  color: #a1aab3;
-  font-weight: 500;
+.station-rain span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.station-rain span:last-child {
+  text-align: right;
+}
+
+.station-rain strong {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.station-rain-empty {
+  display: block;
+  color: #89939d;
+  text-align: center;
+}
+
+.station-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.59rem;
+  line-height: 1.2;
+}
+
+.freshness {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.station-role {
+  overflow: hidden;
+  color: #78838e;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .station-alert {
@@ -508,13 +517,22 @@ button {
 
 .details-toggle {
   width: 100%;
-  margin-top: 7px;
-  padding: 6px 8px;
+  margin-top: auto;
+  padding: 7px 4px 3px;
   color: var(--blue);
   background: transparent;
-  font-size: 0.7rem;
+  font-size: 0.64rem;
   font-weight: 700;
   text-align: center;
+}
+
+.station-swipe-hint {
+  display: none;
+  margin: 5px 3px 0;
+  color: var(--muted);
+  font-size: 0.61rem;
+  font-weight: 700;
+  text-align: right;
 }
 
 .station-details {
@@ -614,8 +632,7 @@ button {
     flex-direction: row;
   }
 
-  .legend-grid,
-  .station-grid {
+  .legend-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -638,75 +655,63 @@ button {
   }
 
   .station-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    padding: 1px 1px 8px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .station-grid::-webkit-scrollbar {
+    display: none;
   }
 
   .station-card {
+    flex: 0 0 calc((100% - 7px) / 2);
     padding: 8px 7px 7px;
     border-left-width: 4px;
     border-radius: 11px;
+    scroll-snap-align: start;
   }
 
-  .station-head {
-    display: block;
-  }
-
-  .station-title h3 {
-    font-size: 0.78rem;
-  }
-
-  .station-sector {
-    font-size: 0.59rem;
-  }
-
-  .station-badges {
-    justify-content: flex-start;
-    max-width: none;
-    margin-top: 5px;
+  .station-head h3 {
+    font-size: 0.74rem;
   }
 
   .badge {
-    padding: 2px 5px;
-    font-size: 0.52rem;
+    padding: 2px 4px;
+    font-size: 0.47rem;
   }
 
-  .freshness {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    margin-top: 5px;
-    font-size: 0.58rem;
+  .primary-readings {
+    margin-top: 7px;
   }
 
-  .auto-shown {
-    width: 100%;
-    margin-left: 0;
+  .primary-temperature {
+    font-size: 1.42rem;
   }
 
-  .metric-grid {
-    gap: 4px;
+  .primary-humidity {
+    font-size: 0.78rem;
+  }
+
+  .station-rain {
+    gap: 3px;
     margin-top: 6px;
-  }
-
-  .metric {
-    padding: 5px 4px;
-    border-radius: 7px;
-  }
-
-  .metric-label {
-    min-height: 2.2em;
+    padding: 4px;
     font-size: 0.52rem;
   }
 
-  .metric-value {
-    font-size: 0.82rem;
-    white-space: normal;
+  .station-meta {
+    gap: 4px;
+    margin-top: 5px;
+    font-size: 0.52rem;
   }
 
-  .metric-temperature .metric-value {
-    font-size: 1rem;
-    font-weight: 800;
-    white-space: normal;
+  .station-swipe-hint {
+    display: block;
   }
 
   .station-alert,
@@ -715,8 +720,8 @@ button {
   }
 
   .details-toggle {
-    padding: 5px 2px;
-    font-size: 0.61rem;
+    padding: 6px 2px 2px;
+    font-size: 0.57rem;
   }
 
   .detail-row {

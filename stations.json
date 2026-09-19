@@ -26,7 +26,7 @@
     },
     {
       "id": "cannaregio_palestra",
-      "name": "Cannaregio – Palestra Marsico",
+      "name": "S. Alvise",
       "type": "wunderground",
       "role": "urban",
       "url": "https://www.wunderground.com/dashboard/pws/IVENIC160",
