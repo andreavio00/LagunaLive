@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-<!-- ATTENZIONE: il numero "?v=4.1" qui e in app.js va aggiornato
+<!-- ATTENZIONE: il numero "?v=4.2" qui e in app.js va aggiornato
      insieme a APP_VERSION (in app.js) e CACHE_NAME (in sw.js) ad ogni
      rilascio. Senza questo numero nell'indirizzo, il browser puo'
      continuare a servire una copia di style.css dalla propria cache
@@ -25,7 +25,7 @@
      l'indirizzo del file diverso da quello precedente, obbligando il
      browser a scaricarlo di nuovo indipendentemente da qualsiasi
      intestazione di cache del server. -->
-<link rel="stylesheet" href="style.css?v=4.1">
+<link rel="stylesheet" href="style.css?v=4.2">
 </head>
 
 <body>
@@ -82,6 +82,16 @@
     </div>
 </div>
 
+<!-- Collegamento alla rete di stazioni amatoriali -->
+<a href="stazioni.html" class="card navigation-card amateur-stations-link">
+    <span class="amateur-stations-icon" aria-hidden="true">📍</span>
+    <span class="amateur-stations-copy">
+        <strong>Stazioni amatoriali</strong>
+        <small>Cannaregio, Murano, Venezia centro e laguna</small>
+    </span>
+    <span class="amateur-stations-arrow" aria-hidden="true">›</span>
+</a>
+
 <!-- CARD 3: Mare -->
 <div class="card home-card card-sea">
     <h2>🌊 Mare</h2>
@@ -111,16 +121,6 @@
 
     <div id="airTime" class="timestamp"></div>
 </div>
-
-<!-- Collegamento alla rete di stazioni amatoriali -->
-<a href="stazioni.html" class="card navigation-card amateur-stations-link">
-    <span class="amateur-stations-icon" aria-hidden="true">📍</span>
-    <span class="amateur-stations-copy">
-        <strong>Stazioni amatoriali</strong>
-        <small>Cannaregio, Murano, Venezia centro e laguna</small>
-    </span>
-    <span class="amateur-stations-arrow" aria-hidden="true">›</span>
-</a>
 
 <!-- CARD 5: Previsioni — fascia oraria attuale, come anteprima di previsioni.html -->
 <div class="card navigation-card card-forecast">
@@ -171,11 +171,11 @@
      serve qui solo per l'anteprima "oggi" e l'avviso allarmi, nessun
      accesso al DOM al suo interno, va caricato prima di app.js che lo
      consuma in loadPrevisioniPreview(). -->
-<script src="previsioni-data.js?v=4.1"></script>
+<script src="previsioni-data.js?v=4.2"></script>
 
 <!-- Stesso numero di versione di style.css qui sopra e di
      APP_VERSION/CACHE_NAME: vedi commento su style.css per il perche'. -->
-<script src="app.js?v=4.1"></script>
+<script src="app.js?v=4.2"></script>
 
 </body>
 </html>

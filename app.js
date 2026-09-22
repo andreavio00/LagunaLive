@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v4.1";
+const APP_VERSION = "v4.2";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -2122,6 +2122,12 @@ const CATEGORIA_TESTO_HOME = {
   rain: "Pioggia", storm: "Temporale", snow: "Neve", fog: "Nebbia"
 };
 
+const PREVISIONI_RETRY_DELAY_MS = 60 * 1000;
+const PREVISIONI_MAX_RETRIES = 3;
+let previsioniRetryTimer = null;
+let previsioniRetryCount = 0;
+let previsioniPreviewLoading = false;
+
 function updatePrevisioniPreviewUI(fascia, oggi) {
   const icona = document.getElementById("previsioniIcon");
   const fasciaLabel = document.getElementById("previsioniFascia");
@@ -2132,8 +2138,8 @@ function updatePrevisioniPreviewUI(fascia, oggi) {
   if (!fascia || !fascia.sintesi) {
     icona.textContent = "📅";
     fasciaLabel.textContent = "";
-    temp.textContent = "Previsioni non disponibili";
-    categoria.textContent = "";
+    temp.textContent = "";
+    categoria.textContent = "Non disponibili";
     extra.textContent = "";
     return;
   }
@@ -2189,7 +2195,31 @@ function updateAllarmeUI(oggi) {
   el.style.display = "block";
 }
 
+function schedulePrevisioniRetry() {
+  if (
+    previsioniRetryTimer !== null ||
+    previsioniRetryCount >= PREVISIONI_MAX_RETRIES
+  ) return;
+
+  previsioniRetryTimer = setTimeout(() => {
+    previsioniRetryTimer = null;
+    previsioniRetryCount += 1;
+    loadPrevisioniPreview();
+  }, PREVISIONI_RETRY_DELAY_MS);
+}
+
+function clearPrevisioniRetry() {
+  if (previsioniRetryTimer !== null) {
+    clearTimeout(previsioniRetryTimer);
+  }
+  previsioniRetryTimer = null;
+  previsioniRetryCount = 0;
+}
+
 async function loadPrevisioniPreview() {
+  if (previsioniPreviewLoading) return;
+  previsioniPreviewLoading = true;
+
   try {
     const previsioni = await PrevisioniData.ottieniPrevisioni();
     const oggi = previsioni.riepilogoGiorni.find((g) => g.data === previsioni.oggiStr);
@@ -2206,13 +2236,21 @@ async function loadPrevisioniPreview() {
       ? oggi.fasceGiorno.find((f) => f.fascia === fasciaOraria.id)
       : null;
 
+    if (!fasciaAttuale || !fasciaAttuale.sintesi) {
+      throw new Error("Fascia di previsione corrente non disponibile");
+    }
+
     updatePrevisioniPreviewUI(fasciaAttuale, oggi);
     updateAllarmeUI(oggi);
+    clearPrevisioniRetry();
 
   } catch (err) {
     console.warn("Anteprima previsioni non disponibile:", err);
     updatePrevisioniPreviewUI(null, null);
     updateAllarmeUI(null);
+    schedulePrevisioniRetry();
+  } finally {
+    previsioniPreviewLoading = false;
   }
 }
 

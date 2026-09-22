@@ -52,12 +52,22 @@ button {
 }
 
 .brand {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   color: var(--navy);
+  padding: 7px 11px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #c8d7e6;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(20, 60, 110, 0.1);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-decoration: none;
+}
+
+.brand:active {
+  transform: translateY(1px);
 }
 
 .page-header h1 {
