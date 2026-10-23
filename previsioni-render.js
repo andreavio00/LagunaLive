@@ -754,20 +754,17 @@ async function init() {
     caricaSituazioneAttuale();
     PrevisioniData.impostaPreferenzaModello(preferenze.modelloPrincipale);
     try {
-        const [previsioni] = await Promise.all([
-            PrevisioniData.ottieniPrevisioni(),
-            PrevisioniData.ottieniAggiornamentiModelli().then(aggiornamenti => {
-                // I metadati sono indipendenti dai dati previsionali.
-                // Un errore dei metadati non deve bloccare il caricamento.
-                return aggiornamenti;
-            }).catch(errore => {
-                console.warn("Metadati aggiornamento modelli non disponibili:", errore);
-                return null;
-            })
-        ]);
-        previsioniCache = previsioni;
-        previsioniCache.aggiornamentiModelli = await PrevisioniData.ottieniAggiornamentiModelli().catch(() => null);
+        // I metadati vengono richiesti in parallelo, ma non devono rallentare
+        // la visualizzazione delle previsioni. Quando arrivano, aggiorniamo
+        // soltanto la dicitura dell'ultimo aggiornamento pubblicato.
+        const aggiornamentiPromise = PrevisioniData.ottieniAggiornamentiModelli().catch(errore => {
+            console.warn("Metadati aggiornamento modelli non disponibili:", errore);
+            return null;
+        });
+        previsioniCache = await PrevisioniData.ottieniPrevisioni();
         renderPagina(previsioniCache);
+        previsioniCache.aggiornamentiModelli = await aggiornamentiPromise;
+        renderAggiornamentoModello(previsioniCache);
     } catch (errore) {
         console.error("Errore nel caricamento delle previsioni:", errore);
         document.getElementById("prvs-oggi-scroll").innerHTML =
