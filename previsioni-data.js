@@ -194,15 +194,77 @@ function impostaPreferenzaModello(valore) {
    ARPAE→ECMWF→Seamless. Usata per scegliere UN'icona/temperatura
    rappresentativa quando serve un valore solo.
    ============================================================ */
-function sintesiPrioritaria(modelli) {
-    if (preferenzaModello === "arpae" && modelli.arpae) return modelli.arpae;
-    if (preferenzaModello === "ecmwf" && modelli.ecmwf) return modelli.ecmwf;
-    if (preferenzaModello === "icon" && modelli.icon) return modelli.icon;
+function chiaveModelloPrioritario(modelli) {
+    if (preferenzaModello === "arpae" && modelli.arpae) return "arpae";
+    if (preferenzaModello === "ecmwf" && modelli.ecmwf) return "ecmwf";
+    if (preferenzaModello === "icon" && modelli.icon) return "icon";
 
-    if (modelli.arpae) return modelli.arpae;
-    if (modelli.ecmwf) return modelli.ecmwf;
-    if (modelli.icon) return modelli.icon;
+    if (modelli.arpae) return "arpae";
+    if (modelli.ecmwf) return "ecmwf";
+    if (modelli.icon) return "icon";
     return null;
+}
+
+function sintesiPrioritaria(modelli) {
+    const chiave = chiaveModelloPrioritario(modelli);
+    return chiave ? modelli[chiave] : null;
+}
+
+/* Metadati di pubblicazione: l'endpoint è specifico per ogni modello.
+   ICON Seamless non espone un meta.json dedicato: per la famiglia DWD
+   usiamo il timestamp più recente fra Global, Europe e D2, indicandolo
+   esplicitamente come ultimo aggiornamento DWD disponibile, non come
+   prova del singolo run usato per ogni ora di previsione. */
+let aggiornamentiModelliCache = null;
+let aggiornamentiModelliPromise = null;
+
+async function leggiMetadatiModello(id) {
+    try {
+        const risposta = await fetch(
+            `https://api.open-meteo.com/data/${id}/static/meta.json`,
+            { cache: "no-store" }
+        );
+        if (!risposta.ok) return null;
+        const json = await risposta.json();
+        const timestamp = Number(json.last_run_availability_time);
+        return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+    } catch (errore) {
+        console.warn(`Metadati non disponibili per ${id}:`, errore);
+        return null;
+    }
+}
+
+async function ottieniAggiornamentiModelli() {
+    if (aggiornamentiModelliCache) return aggiornamentiModelliCache;
+    if (aggiornamentiModelliPromise) return aggiornamentiModelliPromise;
+
+    aggiornamentiModelliPromise = (async () => {
+        const [arpae, ecmwf, iconGlobal, iconEurope, iconD2] = await Promise.all([
+            leggiMetadatiModello("italia_meteo_arpae_icon_2i"),
+            leggiMetadatiModello("ecmwf_ifs025"),
+            leggiMetadatiModello("dwd_icon"),
+            leggiMetadatiModello("dwd_icon_eu"),
+            leggiMetadatiModello("dwd_icon_d2")
+        ]);
+        const iconDwd = [iconGlobal, iconEurope, iconD2]
+            .filter(Number.isFinite)
+            .reduce((max, valore) => valore > max ? valore : max, null);
+
+        aggiornamentiModelliCache = {
+            arpae: arpae ? { timestamp: arpae, etichetta: "ARPAE ICON-2I" } : null,
+            ecmwf: ecmwf ? { timestamp: ecmwf, etichetta: "ECMWF IFS" } : null,
+            icon: iconDwd !== null
+                ? { timestamp: iconDwd, etichetta: "ICON Seamless · ultimo aggiornamento DWD disponibile" }
+                : null
+        };
+        return aggiornamentiModelliCache;
+    })();
+
+    try {
+        return await aggiornamentiModelliPromise;
+    } finally {
+        aggiornamentiModelliPromise = null;
+    }
 }
 
 /* Variante "il più severo vince", utile in futuro per un indicatore
@@ -579,6 +641,7 @@ function elaboraPrevisioni(datiGrezzi) {
         .map(o => ({
             data: o.data,
             ora: o.ora,
+            modelloUsato: chiaveModelloPrioritario(o.modelli),
             marea: stimaMarea(serieMarea, new Date(o.timestamp).getTime()),
             ...sintesiPrioritaria(o.modelli)
         }));
@@ -698,6 +761,7 @@ window.PrevisioniData = {
     formattaDataBreve,
     calcolaConcordanza,
     impostaPreferenzaModello,
+    ottieniAggiornamentiModelli,
     FASCE_ORARIE,
     MODEL_LOCALE,
     MODEL_GLOBALE,
