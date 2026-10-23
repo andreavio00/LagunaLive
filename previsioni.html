@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-    <!-- ATTENZIONE: il numero "?v=4.3" qui e negli script sotto va
+    <!-- ATTENZIONE: il numero "?v=4.4" qui e negli script sotto va
          aggiornato insieme a CACHE_NAME/SHELL_FILES in sw.js e a
          PRVS_VERSION in previsioni-render.js ad ogni rilascio, stesso
          motivo spiegato in index.html per style.css/app.js. -->
-    <link rel="stylesheet" href="previsioni.css?v=4.3">
+    <link rel="stylesheet" href="previsioni.css?v=4.4">
 </head>
 <body>
 
@@ -19,6 +19,7 @@
     <button id="prvs-btn-impostazioni" class="prvs-btn-impostazioni" title="Impostazioni">⚙️</button>
     <h1>Previsioni Meteo</h1>
     <div class="prvs-luogo">Venezia — Centro Storico</div>
+    <div id="prvs-aggiornamento-modello" class="prvs-aggiornamento-modello">Verifica aggiornamento modello…</div>
     <div id="prvs-attuale" class="prvs-attuale">
         <span id="prvs-attuale-osservato" class="prvs-attuale-caricamento">Caricamento situazione attuale…</span>
     </div>
@@ -92,9 +93,9 @@
 
 <!-- Dato osservato in tempo reale (stesse fonti di LagunaLive/index.html):
      va caricato prima di previsioni-render.js, che lo usa in renderAttuale(). -->
-<script src="osservazioni.js?v=4.3"></script>
-<script src="previsioni-data.js?v=4.3"></script>
-<script src="previsioni-render.js?v=4.3"></script>
+<script src="osservazioni.js?v=4.4"></script>
+<script src="previsioni-data.js?v=4.4"></script>
+<script src="previsioni-render.js?v=4.4"></script>
 
 </body>
 </html>
