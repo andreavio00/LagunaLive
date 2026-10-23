@@ -16,7 +16,7 @@ const ICON_PATH = "icons/";
 // incrociata). Va tenuto allineato manualmente a CACHE_NAME/
 // SHELL_FILES in sw.js e ai "?v=..." qui in previsioni.html ad
 // ogni rilascio.
-const PRVS_VERSION = "v4.3";
+const PRVS_VERSION = "v4.4";
 
 /* ============================================================
    PREFERENZE UTENTE — modello principale + campi opzionali nel
@@ -294,7 +294,36 @@ async function caricaSituazioneAttuale() {
    apre sotto di sé le chip orarie (oggi/domani) o di fascia (gli
    altri 5 giorni); click su una chip apre il modal di confronto.
    ============================================================ */
+function renderAggiornamentoModello(previsioni) {
+    const el = document.getElementById("prvs-aggiornamento-modello");
+    if (!el) return;
+
+    const primaOra = previsioni.prossimeOre?.[0];
+    const modello = primaOra?.modelloUsato || null;
+    const info = previsioni.aggiornamentiModelli?.[modello] || null;
+
+    if (!info) {
+        el.textContent = modello === "icon"
+            ? "Aggiornamento ICON Seamless non disponibile"
+            : "Aggiornamento del modello non disponibile";
+        return;
+    }
+
+    const data = new Date(info.timestamp * 1000);
+    const orario = new Intl.DateTimeFormat("it-IT", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Rome"
+    }).format(data);
+
+    el.textContent = `Ultimo aggiornamento pubblicato · ${info.etichetta}: ${orario}`;
+}
+
 function renderPagina(previsioni) {
+    renderAggiornamentoModello(previsioni);
+
     // --- Striscia "Prossime ore": sempre le stesse 10 ore, mai sostituita ---
     const scroll = document.getElementById("prvs-oggi-scroll");
     scroll.innerHTML = "";
@@ -725,7 +754,19 @@ async function init() {
     caricaSituazioneAttuale();
     PrevisioniData.impostaPreferenzaModello(preferenze.modelloPrincipale);
     try {
-        previsioniCache = await PrevisioniData.ottieniPrevisioni();
+        const [previsioni] = await Promise.all([
+            PrevisioniData.ottieniPrevisioni(),
+            PrevisioniData.ottieniAggiornamentiModelli().then(aggiornamenti => {
+                // I metadati sono indipendenti dai dati previsionali.
+                // Un errore dei metadati non deve bloccare il caricamento.
+                return aggiornamenti;
+            }).catch(errore => {
+                console.warn("Metadati aggiornamento modelli non disponibili:", errore);
+                return null;
+            })
+        ]);
+        previsioniCache = previsioni;
+        previsioniCache.aggiornamentiModelli = await PrevisioniData.ottieniAggiornamentiModelli().catch(() => null);
         renderPagina(previsioniCache);
     } catch (errore) {
         console.error("Errore nel caricamento delle previsioni:", errore);
