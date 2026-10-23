@@ -37,6 +37,15 @@ body {
 
 .num { font-family: "Space Grotesk", sans-serif; font-variant-numeric: tabular-nums; }
 
+/* Timestamp dell'ultimo aggiornamento pubblicato dal modello mostrato */
+.prvs-aggiornamento-modello {
+    margin: 0.15rem 1rem 0.7rem;
+    text-align: center;
+    color: var(--inchiostro-soft);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
 /* HEADER */
 .prvs-header {
     background: linear-gradient(135deg, var(--blu), var(--turchese));
