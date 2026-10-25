@@ -330,7 +330,7 @@ function renderThermalIndices(source) {
   const windKmh = windFresh && Number.isFinite(source.windSpeed) ? source.windSpeed * 3.6 : null;
   const chill = !hiApplicable ? windChill(temp, windKmh) : null;
   const indexValue = hiApplicable ? hi : chill;
-  const indexLabel = hiApplicable ? "All'ombra" : chill != null ? "Con vento" : "";
+  const indexLabel = hiApplicable ? "All'ombra" : chill != null ? "Al vento" : "";
 
   let showSun = false;
   let thsw = null;
