@@ -301,8 +301,8 @@ function heatIndex(tempC, humidity) {
 function renderThermalTestIfRequested() {
   const mode = new URLSearchParams(window.location.search).get("thermaltest");
   if (!mode) return;
-  const now = new Date();
-  const stamp = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0") + " " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") + ":00";
+  // Mezzogiorno estivo fittizio: il sole risulta sopra l’orizzonte anche se si prova di notte.
+  const stamp = "2026-07-15 12:00:00";
   const scenarios = {
     heat: { temperature: 32, humidity: 65, radiation: 0, windSpeed: 1, label: "caldo, all’ombra" },
     sun: { temperature: 32, humidity: 65, radiation: 700, windSpeed: 1, label: "caldo e sole" },
