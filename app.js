@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v4.5";
+const APP_VERSION = "v4.6";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -293,6 +293,60 @@ function heatIndex(tempC, humidity) {
   }
 
   return heatIndexC;
+}
+
+
+function windChill(tempC, windKmh) {
+  if (!Number.isFinite(tempC) || !Number.isFinite(windKmh) || tempC > 10 || windKmh <= 4.8) return null;
+  const v16 = Math.pow(windKmh, 0.16);
+  return 13.12 + 0.6215 * tempC - 11.37 * v16 + 0.3965 * tempC * v16;
+}
+
+function renderThermalIndices(source) {
+  const temp = source.temperature;
+  const humidity = source.humidity;
+  const hiApplicable = Number.isFinite(temp) && temp >= 27 && Number.isFinite(humidity) && humidity >= 40;
+  const hi = hiApplicable ? heatIndex(temp, humidity) : null;
+  const windFresh = source.windSpeedTimestamp != null && minutesBetween(source.timestamp, source.windSpeedTimestamp) <= 30;
+  const windKmh = windFresh && Number.isFinite(source.windSpeed) ? source.windSpeed * 3.6 : null;
+  const chill = !hiApplicable ? windChill(temp, windKmh) : null;
+  const indexValue = hiApplicable ? hi : chill;
+  const indexLabel = hiApplicable ? "All'ombra" : chill != null ? "Con vento" : "";
+
+  let showSun = false;
+  let thsw = null;
+  try {
+    const radiationFresh = source.radiationTimestamp != null && minutesBetween(source.timestamp, source.radiationTimestamp) <= 30;
+    const solarAboveHorizon = source.radiationTimestamp != null && solarElevationSin(source.radiationTimestamp) > 0;
+    showSun = hiApplicable && radiationFresh && solarAboveHorizon && Number.isFinite(source.radiation) && source.radiation >= 50;
+    if (showSun) {
+      thsw = apparentTemperatureSun(temp, humidity, source.radiation, source.radiationTimestamp);
+      if (!Number.isFinite(thsw)) showSun = false;
+    }
+  } catch (err) {
+    console.warn("Calcolo temperatura al sole non riuscito:", err);
+    showSun = false;
+  }
+
+  const shadowLabel = document.getElementById("thermalIndexLabel");
+  const shadowValue = document.getElementById("heatIndex");
+  const sunLabel = document.getElementById("thswLabel");
+  const sunValue = document.getElementById("thsw");
+  const titleCell = document.getElementById("thermalTitleCell");
+  const title = document.getElementById("thermalTitle");
+  const labelRow = shadowLabel.closest(".triple-row");
+  const valueRow = shadowValue.closest(".triple-row");
+
+  shadowLabel.textContent = indexLabel;
+  shadowValue.textContent = indexValue == null ? "—" : indexValue.toFixed(1) + " °C";
+  sunLabel.style.display = showSun ? "" : "none";
+  sunValue.style.display = showSun ? "" : "none";
+  labelRow.classList.toggle("single-index", !showSun);
+  valueRow.classList.toggle("single-index", !showSun);
+  labelRow.classList.toggle("no-index", indexValue == null);
+  valueRow.classList.toggle("no-index", indexValue == null);
+  titleCell.style.display = indexValue == null ? "none" : "";
+  title.textContent = hiApplicable ? "Indice di calore" : chill != null ? "Temperatura percepita" : "";
 }
 
 const VENICE_LAT = 45.4408;
@@ -1878,7 +1932,7 @@ function updateLidoMeteoUI(lidoMeteo) {
       ? "Lido: " + lidoMeteo.humidity.toFixed(0) +
         " % (" + formatTimeIsprambiente(lidoMeteo.timestamp) + ")" +
         (lidoMeteo.temperature != null
-          ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(lidoMeteo.temperature, lidoMeteo.humidity).toFixed(1)} °C</span>`
+          ? ``
           : "") +
         (lidoMeteo.stale ? ' <span class="stale-warning">⚠️ dati non aggiornati</span>' : "")
       : "Lido: n.d.";
@@ -1905,7 +1959,7 @@ function updateCannaregioPalestraUI(palestra) {
       ? "S. Alvise: " + palestra.humidity.toFixed(0) +
         " %" + timeText +
         (palestra.temperature != null
-          ? ` <span class="sub-station-extra">&middot; percepiti ${heatIndex(palestra.temperature, palestra.humidity).toFixed(1)} °C</span>`
+          ? ``
           : "") +
         staleText
       : "S. Alvise: n.d.";
@@ -1961,25 +2015,7 @@ async function loadAll() {
         " &middot; 🕐 " + formatTime(source.timestamp);
       document.getElementById("humidity").textContent =
         Number.isFinite(source.humidity) ? source.humidity.toFixed(0) + " %" : "n.d.";
-      const hi = heatIndex(source.temperature, source.humidity);
-      document.getElementById("heatIndex").textContent =
-        Number.isFinite(hi) ? hi.toFixed(1) + " °C" : "n.d.";
-      let thsw = hi;
-      try {
-        const radiationFresh = source.radiationTimestamp != null &&
-          minutesBetween(source.timestamp, source.radiationTimestamp) <= 30;
-        thsw = apparentTemperatureSun(
-          source.temperature, source.humidity,
-          radiationFresh ? source.radiation : null,
-          radiationFresh ? source.radiationTimestamp : null
-        );
-        if (thsw == null || isNaN(thsw)) thsw = hi;
-      } catch (err) {
-        console.warn("Calcolo temperatura al sole non riuscito:", err);
-        thsw = hi;
-      }
-      document.getElementById("thsw").textContent =
-        Number.isFinite(thsw) ? thsw.toFixed(1) + " °C" : "n.d.";
+      renderThermalIndices(source);
       document.getElementById("humidityStation").innerHTML =
         (fromCavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
         " &middot; 🕐 " + formatTime(source.timestamp);
@@ -1993,7 +2029,7 @@ async function loadAll() {
           : "Osservatorio Cavanis: n.d.";
       if (earlyCavanis) {
         document.getElementById("humidityCavalli").innerHTML =
-          `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`;
+          `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})`;
       }
       const rainHourText = cavalli.rainLastHour != null && !isNaN(cavalli.rainLastHour)
         ? cavalli.rainLastHour.toFixed(1) + " mm/h" : "n.d.";
@@ -2092,43 +2128,7 @@ async function loadAll() {
     document.getElementById("humidity").innerHTML =
       thermalSource.humidity.toFixed(0) + " %";
 
-    const hi = heatIndex(thermalSource.temperature, thermalSource.humidity);
-
-    document.getElementById("heatIndex").innerHTML =
-      hi.toFixed(1) + " °C";
-
-    const STALE_MINUTES = 30;
-
-    // Il calcolo "al sole" e' isolato in un try/catch dedicato: se per
-    // qualsiasi motivo imprevisto va in errore (es. un caso limite nei
-    // dati non ancora visto), "al sole" torna semplicemente uguale ad
-    // "all'ombra" invece di bloccare il caricamento di tutto il resto
-    // della pagina (mare, vento, pioggia, pressione).
-    let thsw = hi;
-
-    try {
-
-      const radiationFresh =
-        thermalSource.radiationTimestamp != null &&
-        minutesBetween(thermalSource.timestamp, thermalSource.radiationTimestamp) <= STALE_MINUTES;
-
-      thsw = apparentTemperatureSun(
-        thermalSource.temperature,
-        thermalSource.humidity,
-        radiationFresh ? thermalSource.radiation : null,
-        radiationFresh ? thermalSource.radiationTimestamp : null
-      );
-
-      if (thsw == null || isNaN(thsw)) {
-        thsw = hi;
-      }
-
-    } catch (thswError) {
-      console.error("Errore nel calcolo dell'indice al sole, uso il valore all'ombra:", thswError);
-    }
-
-    document.getElementById("thsw").innerHTML =
-      thsw.toFixed(1) + " °C";
+    renderThermalIndices(thermalSource);
 
     document.getElementById("humidityStation").innerHTML =
       (cavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
@@ -2136,7 +2136,7 @@ async function loadAll() {
 
     document.getElementById("humidityCavalli").innerHTML =
       cavanis
-        ? `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`
+        ? `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)})`
         : "Osservatorio Cavanis: n.d.";
 
     // humidityLidoMeteo e humidityPalestra vengono aggiornati dai
