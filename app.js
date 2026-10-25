@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v4.4";
+const APP_VERSION = "v4.5";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -1946,17 +1946,122 @@ async function loadAll() {
         updateCannaregioPalestraUI({ available: false, stale: false });
       });
 
+    // Aggiornamento progressivo: ogni scheda principale si aggiorna appena
+    // arriva la propria fonte, senza aspettare la più lenta delle altre.
+    // Il rendering completo più sotto resta come riallineamento finale.
+    let earlyCavalli = null;
+    let earlyCavanis = null;
+
+    function renderEarlyThermal(source, fromCavanis) {
+      if (!source) return;
+      document.getElementById("temp").textContent =
+        Number.isFinite(source.temperature) ? source.temperature.toFixed(1) + " °C" : "n.d.";
+      document.getElementById("tempStation").innerHTML =
+        (fromCavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
+        " &middot; 🕐 " + formatTime(source.timestamp);
+      document.getElementById("humidity").textContent =
+        Number.isFinite(source.humidity) ? source.humidity.toFixed(0) + " %" : "n.d.";
+      const hi = heatIndex(source.temperature, source.humidity);
+      document.getElementById("heatIndex").textContent =
+        Number.isFinite(hi) ? hi.toFixed(1) + " °C" : "n.d.";
+      let thsw = hi;
+      try {
+        const radiationFresh = source.radiationTimestamp != null &&
+          minutesBetween(source.timestamp, source.radiationTimestamp) <= 30;
+        thsw = apparentTemperatureSun(
+          source.temperature, source.humidity,
+          radiationFresh ? source.radiation : null,
+          radiationFresh ? source.radiationTimestamp : null
+        );
+        if (thsw == null || isNaN(thsw)) thsw = hi;
+      } catch (err) {
+        console.warn("Calcolo temperatura al sole non riuscito:", err);
+        thsw = hi;
+      }
+      document.getElementById("thsw").textContent =
+        Number.isFinite(thsw) ? thsw.toFixed(1) + " °C" : "n.d.";
+      document.getElementById("humidityStation").innerHTML =
+        (fromCavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
+        " &middot; 🕐 " + formatTime(source.timestamp);
+    }
+
+    function renderEarlyCavalli(cavalli) {
+      document.getElementById("subCavalli").innerHTML =
+        earlyCavanis
+          ? "Palazzo Cavalli: " + cavalli.temperature.toFixed(1) +
+            " °C (" + formatTime(cavalli.timestamp) + ")"
+          : "Osservatorio Cavanis: n.d.";
+      if (earlyCavanis) {
+        document.getElementById("humidityCavalli").innerHTML =
+          `Palazzo Cavalli: ${cavalli.humidity.toFixed(0)} % (${formatTime(cavalli.timestamp)}) <span class="sub-station-extra">&middot; percepiti ${heatIndex(cavalli.temperature, cavalli.humidity).toFixed(1)} °C</span>`;
+      }
+      const rainHourText = cavalli.rainLastHour != null && !isNaN(cavalli.rainLastHour)
+        ? cavalli.rainLastHour.toFixed(1) + " mm/h" : "n.d.";
+      const rain24hText = cavalli.rain24h != null && !isNaN(cavalli.rain24h)
+        ? cavalli.rain24h.toFixed(1) + " mm/24h" : "n.d.";
+      document.getElementById("rain").innerHTML = rainHourText + " &middot; " + rain24hText;
+      document.getElementById("pressure").textContent =
+        Number.isFinite(cavalli.pressure) ? cavalli.pressure.toFixed(1) + " hPa" : "n.d.";
+      document.getElementById("airTime").textContent = formatTime(cavalli.timestamp);
+      if (!earlyCavanis) {
+        renderEarlyThermal({
+          timestamp: cavalli.timestamp,
+          temperature: cavalli.temperature,
+          humidity: cavalli.humidity,
+          radiation: cavalli.radiation,
+          radiationTimestamp: cavalli.timestamp
+        }, false);
+      }
+    }
+
+    function renderEarlyTide(puntaSalute) {
+      document.getElementById("tide").textContent = puntaSalute.tide + " cm " + puntaSalute.trend;
+      document.getElementById("waterTemp").textContent =
+        puntaSalute.waterTemp != null ? puntaSalute.waterTemp.toFixed(1) + " °C" : "n.d.";
+      document.getElementById("tideInfo").innerHTML =
+        formatTime(puntaSalute.timestamp) + " &middot; " + puntaSalute.source;
+    }
+
+    function renderEarlyWind(misericordiaWind) {
+      document.getElementById("wind").innerHTML =
+        misericordiaWind.available
+          ? (misericordiaWind.windDir != null && !isNaN(misericordiaWind.windDir)
+              ? windDirection(misericordiaWind.windDir) + " " : "") +
+            (misericordiaWind.windSpeed != null && !isNaN(misericordiaWind.windSpeed)
+              ? Math.round(misericordiaWind.windSpeed * 3.6) + " km/h" : "n.d.")
+          : "n.d.";
+    }
+
     const [cavalli, cavanis, puntaSalute, misericordiaWind] = await Promise.all([
-      loadPalazzoCavalli(),
+      loadPalazzoCavalli().then(c => {
+        earlyCavalli = c;
+        renderEarlyCavalli(c);
+        return c;
+      }),
       loadCavanis().catch(err => {
         // Cavanis non deve mai impedire il caricamento delle altre card.
         // Se sia il Worker sia ARPA falliscono, temperatura e umidita'
         // usano temporaneamente Palazzo Cavalli come fonte principale.
         console.warn("Cavanis non disponibile, uso Palazzo Cavalli:", err);
         return null;
+      }).then(c => {
+        earlyCavanis = c;
+        if (c) {
+          renderEarlyThermal(c, true);
+          if (earlyCavalli) renderEarlyCavalli(earlyCavalli);
+        } else if (earlyCavalli) {
+          renderEarlyCavalli(earlyCavalli);
+        }
+        return c;
       }),
-      loadTide(),
-      loadMisericordiaWind()
+      loadTide().then(p => {
+        renderEarlyTide(p);
+        return p;
+      }),
+      loadMisericordiaWind().then(w => {
+        renderEarlyWind(w);
+        return w;
+      })
     ]);
 
     const thermalSource = cavanis || {
