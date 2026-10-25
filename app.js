@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v4.6";
+const APP_VERSION = "v4.7";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -296,6 +296,25 @@ function heatIndex(tempC, humidity) {
 }
 
 
+// Modalità di prova: aggiungere ?thermaltest=heat,wind,normal o sun all’indirizzo.
+// I dati fittizi cambiano solo gli indici termici, non le altre letture della pagina.
+function renderThermalTestIfRequested() {
+  const mode = new URLSearchParams(window.location.search).get("thermaltest");
+  if (!mode) return;
+  const now = new Date();
+  const stamp = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0") + " " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") + ":00";
+  const scenarios = {
+    heat: { temperature: 32, humidity: 65, radiation: 0, windSpeed: 1, label: "caldo, all’ombra" },
+    sun: { temperature: 32, humidity: 65, radiation: 700, windSpeed: 1, label: "caldo e sole" },
+    wind: { temperature: 5, humidity: 80, radiation: 0, windSpeed: 5, label: "freddo e vento" },
+    normal: { temperature: 15, humidity: 60, radiation: 0, windSpeed: 1, label: "condizioni normali" }
+  };
+  const sample = scenarios[mode];
+  if (!sample) return;
+  renderThermalIndices({ timestamp: stamp, temperature: sample.temperature, humidity: sample.humidity, radiation: sample.radiation, radiationTimestamp: stamp, windSpeed: sample.windSpeed, windSpeedTimestamp: stamp });
+  document.getElementById("status").textContent += " · PROVA: " + sample.label + " (dati fittizi)";
+}
+
 function windChill(tempC, windKmh) {
   if (!Number.isFinite(tempC) || !Number.isFinite(windKmh) || tempC > 10 || windKmh <= 4.8) return null;
   const v16 = Math.pow(windKmh, 0.16);
@@ -332,7 +351,6 @@ function renderThermalIndices(source) {
   const shadowValue = document.getElementById("heatIndex");
   const sunLabel = document.getElementById("thswLabel");
   const sunValue = document.getElementById("thsw");
-  const titleCell = document.getElementById("thermalTitleCell");
   const title = document.getElementById("thermalTitle");
   const labelRow = shadowLabel.closest(".triple-row");
   const valueRow = shadowValue.closest(".triple-row");
@@ -345,8 +363,7 @@ function renderThermalIndices(source) {
   valueRow.classList.toggle("single-index", !showSun);
   labelRow.classList.toggle("no-index", indexValue == null);
   valueRow.classList.toggle("no-index", indexValue == null);
-  titleCell.style.display = indexValue == null ? "none" : "";
-  title.textContent = hiApplicable ? "Indice di calore" : chill != null ? "Temperatura percepita" : "";
+  title.textContent = "Temperatura percepita";
 }
 
 const VENICE_LAT = 45.4408;
@@ -2113,6 +2130,10 @@ async function loadAll() {
       windSpeedTimestamp: misericordiaWind.available ? misericordiaWind.timestamp : null
     };
 
+    // Il vento della Misericordia serve anche quando la temperatura arriva da Cavanis.
+    thermalSource.windSpeed = misericordiaWind.available ? misericordiaWind.windSpeed : null;
+    thermalSource.windSpeedTimestamp = misericordiaWind.available ? misericordiaWind.timestamp : null;
+
     // --- Card 1: temperatura, Cavanis come stazione principale ---
 
     document.getElementById("temp").innerHTML =
@@ -2134,6 +2155,7 @@ async function loadAll() {
       thermalSource.humidity.toFixed(0) + " %";
 
     renderThermalIndices(thermalSource);
+    renderThermalTestIfRequested();
 
     document.getElementById("humidityStation").innerHTML =
       (cavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
