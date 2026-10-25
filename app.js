@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v4.8";
+const APP_VERSION = "v4.9";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -357,13 +357,21 @@ function renderThermalIndices(source) {
 
   shadowLabel.textContent = indexLabel;
   shadowValue.textContent = indexValue == null ? "—" : indexValue.toFixed(1) + " °C";
-  // Se non c'è alcun indice, mostriamo due trattini sotto il titolo
-  // e lasciamo vuote le etichette; l'umidità resta sempre nella sua colonna.
+
+  // Il THSW va scritto esplicitamente nel suo elemento: prima veniva
+  // calcolato, ma il valore non era mai assegnato alla schermata.
+  sunLabel.textContent = showSun ? "Al sole" : "";
+  sunValue.textContent = showSun ? thsw.toFixed(1) + " °C" : "";
+
+  // Se manca qualsiasi indice, mostra un solo trattino centrato
+  // nell'intera area della temperatura percepita.
   const noIndex = indexValue == null;
-  sunLabel.style.display = (showSun || noIndex) ? "" : "none";
-  sunValue.style.display = (showSun || noIndex) ? "" : "none";
+  sunLabel.style.display = showSun ? "" : "none";
+  sunValue.style.display = showSun ? "" : "none";
   labelRow.classList.toggle("single-index", !showSun && !noIndex);
   valueRow.classList.toggle("single-index", !showSun && !noIndex);
+  labelRow.classList.toggle("no-index", noIndex);
+  valueRow.classList.toggle("no-index", noIndex);
   title.textContent = "Temperatura percepita";
 }
 
