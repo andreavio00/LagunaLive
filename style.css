@@ -745,5 +745,7 @@ body.modal-open {
 }
 
 /* Indici termici dinamici: nasconde le colonne non pertinenti alle condizioni. */
-.triple-row.single-index .col-2 { flex: 2; }
-.triple-row.single-index .col-3 { display: none; }
+.triple-row.single-index .col-2,
+.triple-row.no-index .col-2 { flex: 2; }
+.triple-row.single-index .col-3,
+.triple-row.no-index .col-3 { display: none; }
