@@ -2,7 +2,7 @@
 // fondo alla pagina. Da allineare manualmente al numero della cache
 // in sw.js (CACHE_NAME) quando si rilascia una nuova versione, cosi'
 // i due numeri restano sempre coerenti tra loro.
-const APP_VERSION = "v4.7";
+const APP_VERSION = "v4.8";
 
 const CAVANIS_URL =
   "https://www.meteonetwork.eu/it/weather-station/vnt375-stazione-meteorologica-di-osservatorio-cavanis-venezia";
@@ -357,12 +357,13 @@ function renderThermalIndices(source) {
 
   shadowLabel.textContent = indexLabel;
   shadowValue.textContent = indexValue == null ? "—" : indexValue.toFixed(1) + " °C";
-  sunLabel.style.display = showSun ? "" : "none";
-  sunValue.style.display = showSun ? "" : "none";
-  labelRow.classList.toggle("single-index", !showSun);
-  valueRow.classList.toggle("single-index", !showSun);
-  labelRow.classList.toggle("no-index", indexValue == null);
-  valueRow.classList.toggle("no-index", indexValue == null);
+  // Se non c'è alcun indice, mostriamo due trattini sotto il titolo
+  // e lasciamo vuote le etichette; l'umidità resta sempre nella sua colonna.
+  const noIndex = indexValue == null;
+  sunLabel.style.display = (showSun || noIndex) ? "" : "none";
+  sunValue.style.display = (showSun || noIndex) ? "" : "none";
+  labelRow.classList.toggle("single-index", !showSun && !noIndex);
+  valueRow.classList.toggle("single-index", !showSun && !noIndex);
   title.textContent = "Temperatura percepita";
 }
 
