@@ -2155,7 +2155,6 @@ async function loadAll() {
       thermalSource.humidity.toFixed(0) + " %";
 
     renderThermalIndices(thermalSource);
-    renderThermalTestIfRequested();
 
     document.getElementById("humidityStation").innerHTML =
       (cavanis ? "Osservatorio Cavanis" : "Palazzo Cavalli &middot; Cavanis n.d.") +
@@ -2223,6 +2222,8 @@ async function loadAll() {
       now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) +
       (cavanis ? "" : " &middot; Cavanis non disponibile") +
       " &middot; " + APP_VERSION;
+
+    renderThermalTestIfRequested();
 
   } catch (error) {
 
