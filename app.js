@@ -2105,7 +2105,12 @@ async function loadAll() {
       temperature: cavalli.temperature,
       humidity: cavalli.humidity,
       radiation: cavalli.radiation,
-      radiationTimestamp: cavalli.timestamp
+      radiationTimestamp: cavalli.timestamp,
+      // In assenza di Cavanis usiamo il vento CPSM solo se recente
+      // rispetto alla lettura termica; renderThermalIndices applica
+      // comunque il controllo dei 30 minuti prima di calcolare il wind chill.
+      windSpeed: misericordiaWind.available ? misericordiaWind.windSpeed : null,
+      windSpeedTimestamp: misericordiaWind.available ? misericordiaWind.timestamp : null
     };
 
     // --- Card 1: temperatura, Cavanis come stazione principale ---
